@@ -1,27 +1,32 @@
 import { Component, OnInit, OnDestroy, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { NgIf, NgFor, CommonModule } from '@angular/common';
+import { NgIf, NgFor, CommonModule, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-interface Bottle {
+interface Wish {
   _id: string;
   message: string;
-  bottleType: string;
-  stoneType: string;
-  replies: string[];
+  anonymousName: string;
+  drawingPoints: number[][][]; // [[[x,y], [x,y]], ...]
+  color: string;
   x: number;
   y: number;
   speed: number;
+  angle: number;
+  rotationSpeed: number;
+  replies: string[];
   createdAt: string;
-  // Local animation variables
-  angle?: number;
   pulse?: number;
   bubbles?: any[];
 }
 
+const ADJECTIVES = ["Glowing", "Silent", "Nebula", "Ethereal", "Whispering", "Sunken", "Cosmic", "Golden", "Mystic", "Drifting", "Prismatic", "Gentle"];
+const MARINE_NOUNS = ["Seaglass", "Coral", "Anemone", "Seahorse", "Dolphin", "Manta", "Jellyfish", "Nautilus", "Current", "Pearl", "Lagoon", "Shell"];
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#d946ef", "#06b6d4"];
+
 @Component({
   selector: 'app-root',
-  imports: [NgIf, NgFor, CommonModule, FormsModule],
+  imports: [NgIf, NgFor, CommonModule, FormsModule, TitleCasePipe],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
@@ -30,38 +35,36 @@ export class App implements OnInit, OnDestroy {
   public apiBase = 'https://task-management-mern-mean.vercel.app/api';
 
   // Signals
-  bottles = signal<Bottle[]>([]);
-  selectedBottle = signal<Bottle | null>(null);
+  wishes = signal<Wish[]>([]);
+  selectedWish = signal<Wish | null>(null);
   showWriteModal = signal<boolean>(false);
   loading = signal<boolean>(true);
   serverStatus = signal<string>('offline');
   soundEnabled = signal<boolean>(false);
-  activeFilter = signal<string>('all'); // all, amethyst, aquamarine, citrine
+  userIdentity = signal<string>('');
 
   // Form states
   messageText = '';
-  bottleType = 'sapphire';
-  stoneType = 'none';
+  wishColor = COLORS[0];
   replyText = '';
+  colors = COLORS;
 
-  // Local loop variables
+  // Drawing pad state
+  private strokes: number[][][] = []; // [[[x,y],[x,y]], ...]
+  private isDrawing = false;
+  private sketchCanvas: HTMLCanvasElement | null = null;
+  private sketchCtx: CanvasRenderingContext2D | null = null;
+
+  // Animation states
   private animationId: number | null = null;
   private canvasElement: HTMLCanvasElement | null = null;
   private canvasCtx: CanvasRenderingContext2D | null = null;
-  private stars: any[] = [];
-
-  // Computed properties
-  filteredBottles = computed(() => {
-    const list = this.bottles();
-    const filter = this.activeFilter();
-    if (filter === 'all') return list;
-    return list.filter(b => b.stoneType === filter);
-  });
+  private particles: any[] = [];
 
   ngOnInit() {
+    this.initIdentity();
     this.fetchInitialData();
-    // Poll every 10 seconds
-    setInterval(() => this.fetchBottles(), 10000);
+    setInterval(() => this.fetchWishes(), 10000);
   }
 
   ngOnDestroy() {
@@ -70,12 +73,23 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  initIdentity() {
+    let stored = localStorage.getItem('ocean_wisher_identity');
+    if (!stored) {
+      const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+      const noun = MARINE_NOUNS[Math.floor(Math.random() * MARINE_NOUNS.length)];
+      stored = `${adj} ${noun}`;
+      localStorage.setItem('ocean_wisher_identity', stored);
+    }
+    this.userIdentity.set(stored);
+  }
+
   fetchInitialData() {
     this.loading.set(true);
     this.http.get<{ status: string }>(`${this.apiBase}/status`).subscribe({
       next: () => {
         this.serverStatus.set('online');
-        this.fetchBottles();
+        this.fetchWishes();
       },
       error: () => {
         this.serverStatus.set('offline');
@@ -84,25 +98,23 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  fetchBottles() {
-    this.http.get<Bottle[]>(`${this.apiBase}/bottles`).subscribe({
+  fetchWishes() {
+    this.http.get<Wish[]>(`${this.apiBase}/bottles`).subscribe({
       next: (data) => {
-        // Map data while retaining current coordinates if they exist
-        const updated = data.map(b => {
-          const existing = this.bottles().find(eb => eb._id === b._id);
+        const updated = data.map(w => {
+          const existing = this.wishes().find(ew => ew._id === w._id);
           return {
-            ...b,
-            x: existing ? existing.x : (b.x / 100) * window.innerWidth,
-            y: existing ? existing.y : (b.y / 100) * window.innerHeight,
-            angle: existing ? existing.angle : Math.random() * Math.PI * 2,
+            ...w,
+            x: existing ? existing.x : (w.x / 100) * window.innerWidth,
+            y: existing ? existing.y : (w.y / 100) * window.innerHeight,
+            angle: existing ? existing.angle : w.angle || Math.random() * Math.PI * 2,
+            rotationSpeed: existing ? existing.rotationSpeed : w.rotationSpeed || (Math.random() * 0.006 - 0.003),
             pulse: existing ? existing.pulse : Math.random() * Math.PI,
             bubbles: existing ? existing.bubbles : []
           };
         });
-        this.bottles.set(updated);
+        this.wishes.set(updated);
         this.loading.set(false);
-        
-        // Start animation once canvas loads
         setTimeout(() => this.initCanvas(), 100);
       },
       error: () => this.loading.set(false)
@@ -116,20 +128,19 @@ export class App implements OnInit, OnDestroy {
     if (!this.canvasElement) return;
 
     this.canvasCtx = this.canvasElement.getContext('2d');
-    
-    // Resize
     this.canvasElement.width = window.innerWidth;
     this.canvasElement.height = window.innerHeight;
 
-    // Build Stars
-    this.stars = Array.from({ length: 80 }, () => ({
+    // Ambient floating particles
+    this.particles = Array.from({ length: 50 }, () => ({
       x: Math.random() * window.innerWidth,
-      y: Math.random() * (window.innerHeight * 0.4),
-      size: Math.random() * 1.5 + 0.5,
-      twinkle: Math.random() * Math.PI
+      y: Math.random() * window.innerHeight,
+      size: Math.random() * 2 + 1,
+      speedY: -(Math.random() * 0.4 + 0.2),
+      speedX: (Math.random() * 0.2 - 0.1),
+      alpha: Math.random() * 0.5 + 0.2
     }));
 
-    // Start loop
     this.loop();
   }
 
@@ -144,161 +155,81 @@ export class App implements OnInit, OnDestroy {
     if (!canvas || !ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     const now = Date.now();
 
-    // 1. Draw Sky Gradient
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
-    skyGrad.addColorStop(0, '#060a13');
-    skyGrad.addColorStop(0.5, '#0b1325');
-    skyGrad.addColorStop(1, '#16223f');
-    ctx.fillStyle = skyGrad;
+    // 1. Water Gradient Background
+    const waterGrad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    waterGrad.addColorStop(0, '#020617');
+    waterGrad.addColorStop(0.5, '#07152e');
+    waterGrad.addColorStop(1, '#020d22');
+    ctx.fillStyle = waterGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Draw Stars
-    this.stars.forEach(star => {
-      star.twinkle += 0.02;
-      const opacity = (Math.sin(star.twinkle) + 1) / 2 * 0.8 + 0.2;
-      ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+    // 2. Ripple Grid
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.03)';
+    ctx.lineWidth = 1;
+    const rippleSize = 80;
+    for (let x = 0; x < canvas.width; x += rippleSize) {
       ctx.beginPath();
-      ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+      for (let y = 0; y < canvas.height; y += 10) {
+        const shift = Math.sin(y * 0.01 + now * 0.001) * 8;
+        ctx.lineTo(x + shift, y);
+      }
+      ctx.stroke();
+    }
+
+    // 3. Ambient Particles
+    this.particles.forEach(p => {
+      p.y += p.speedY;
+      p.x += p.speedX;
+      if (p.y < -10) {
+        p.y = canvas.height + 10;
+        p.x = Math.random() * canvas.width;
+      }
+      ctx.fillStyle = `rgba(34, 211, 238, ${p.alpha * (0.3 + 0.3 * Math.sin(now * 0.001))})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // 3. Draw Glowing Moon
-    const moonX = canvas.width * 0.8;
-    const moonY = canvas.height * 0.15;
-    const moonGlow = ctx.createRadialGradient(moonX, moonY, 10, moonX, moonY, 80);
-    moonGlow.addColorStop(0, 'rgba(255, 253, 245, 0.4)');
-    moonGlow.addColorStop(0.5, 'rgba(235, 245, 255, 0.1)');
-    moonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = moonGlow;
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, 80, 0, Math.PI * 2);
-    ctx.fill();
+    // 4. Draw Floating Wishes
+    this.wishes().forEach(wish => {
+      wish.x += wish.speed * 0.3;
+      if (!wish.pulse) wish.pulse = 0;
+      wish.pulse += 0.015;
+      wish.y += Math.sin(now * 0.0005 + wish.pulse) * 0.05;
+      wish.angle += wish.rotationSpeed;
 
-    ctx.fillStyle = '#fffdf0';
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 4. Update and Draw Floating Bottles
-    this.filteredBottles().forEach(bottle => {
-      // Update coordinates
-      bottle.x += bottle.speed;
-      if (bottle.x > canvas.width + 40) {
-        bottle.x = -40;
-        bottle.y = Math.random() * (canvas.height * 0.5) + (canvas.height * 0.3);
+      if (wish.x > canvas.width + 60) {
+        wish.x = -60;
+        wish.y = Math.random() * canvas.height;
       }
 
-      // Wave oscillation
-      if (!bottle.pulse) bottle.pulse = 0;
-      bottle.pulse += 0.015;
-      const waveOffset = Math.sin(bottle.pulse) * 8;
-      const currentY = bottle.y + waveOffset;
+      ctx.save();
+      ctx.translate(wish.x, wish.y);
+      ctx.rotate(wish.angle);
+      ctx.scale(0.35, 0.35);
+      ctx.translate(-100, -100);
 
-      // Generate bubbles
-      if (!bottle.bubbles) bottle.bubbles = [];
-      if (Math.random() < 0.03) {
-        bottle.bubbles.push({
-          x: bottle.x + (Math.random() * 20 - 10),
-          y: currentY,
-          size: Math.random() * 2 + 1,
-          speedY: Math.random() * 0.5 + 0.3,
-          opacity: 1
-        });
-      }
+      ctx.strokeStyle = wish.color;
+      ctx.shadowColor = wish.color;
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-      // Draw bubbles
-      bottle.bubbles.forEach((bubble, idx) => {
-        bubble.y -= bubble.speedY;
-        bubble.opacity -= 0.005;
-        if (bubble.opacity <= 0) {
-          bottle.bubbles!.splice(idx, 1);
-          return;
-        }
-        ctx.fillStyle = `rgba(255, 255, 255, ${bubble.opacity * 0.4})`;
+      wish.drawingPoints.forEach(stroke => {
+        if (stroke.length < 2) return;
         ctx.beginPath();
-        ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(stroke[0][0], stroke[0][1]);
+        for (let i = 1; i < stroke.length; i++) {
+          ctx.lineTo(stroke[i][0], stroke[i][1]);
+        }
+        ctx.stroke();
       });
 
-      let glowColor = '#3b82f6';
-      if (bottle.bottleType === 'emerald') glowColor = '#10b981';
-      else if (bottle.bottleType === 'amber') glowColor = '#f59e0b';
-      else if (bottle.bottleType === 'rose') glowColor = '#ec4899';
-
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = glowColor;
-
-      // Draw stone
-      if (bottle.stoneType && bottle.stoneType !== 'none') {
-        let stoneGlow = '#d946ef';
-        if (bottle.stoneType === 'aquamarine') stoneGlow = '#06b6d4';
-        else if (bottle.stoneType === 'citrine') stoneGlow = '#eab308';
-        
-        ctx.fillStyle = stoneGlow;
-        ctx.shadowColor = stoneGlow;
-        ctx.beginPath();
-        ctx.arc(bottle.x, currentY + 12, 5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Draw Bottle
-      ctx.fillStyle = glowColor;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-
-      ctx.beginPath();
-      ctx.moveTo(bottle.x - 4, currentY - 15);
-      ctx.lineTo(bottle.x + 4, currentY - 15);
-      ctx.lineTo(bottle.x + 4, currentY - 8);
-      ctx.bezierCurveTo(bottle.x + 10, currentY - 8, bottle.x + 12, currentY - 3, bottle.x + 12, currentY);
-      ctx.lineTo(bottle.x + 10, currentY + 15);
-      ctx.bezierCurveTo(bottle.x + 10, currentY + 22, bottle.x - 10, currentY + 22, bottle.x - 10, currentY + 15);
-      ctx.lineTo(bottle.x - 12, currentY);
-      ctx.bezierCurveTo(bottle.x - 12, currentY - 3, bottle.x - 10, currentY - 8, bottle.x - 4, currentY - 8);
-      ctx.closePath();
-
-      ctx.fillStyle = `rgba(${parseInt(glowColor.substr(1,2),16)}, ${parseInt(glowColor.substr(3,2),16)}, ${parseInt(glowColor.substr(5,2),16)}, 0.15)`;
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#a16207';
-      ctx.fillRect(bottle.x - 3, currentY - 18, 6, 4);
+      ctx.restore();
     });
-
-    // 5. Draw Waves overlay
-    const waveGrad1 = ctx.createLinearGradient(0, canvas.height * 0.4, 0, canvas.height);
-    waveGrad1.addColorStop(0, 'rgba(10, 24, 53, 0.4)');
-    waveGrad1.addColorStop(1, 'rgba(5, 12, 28, 0.9)');
-
-    ctx.fillStyle = waveGrad1;
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height);
-    for (let i = 0; i <= canvas.width; i += 20) {
-      const y = Math.sin(i * 0.003 + now * 0.0006) * 15 + canvas.height * 0.55;
-      ctx.lineTo(i, y);
-    }
-    ctx.lineTo(canvas.width, canvas.height);
-    ctx.closePath();
-    ctx.fill();
-
-    const waveGrad2 = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
-    waveGrad2.addColorStop(0, 'rgba(12, 34, 76, 0.5)');
-    waveGrad2.addColorStop(1, 'rgba(4, 9, 21, 0.95)');
-
-    ctx.fillStyle = waveGrad2;
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height);
-    for (let i = 0; i <= canvas.width; i += 20) {
-      const y = Math.cos(i * 0.004 - now * 0.0008) * 12 + canvas.height * 0.65;
-      ctx.lineTo(i, y);
-    }
-    ctx.lineTo(canvas.width, canvas.height);
-    ctx.closePath();
-    ctx.fill();
   }
 
   handleCanvasClick(e: MouseEvent) {
@@ -307,55 +238,136 @@ export class App implements OnInit, OnDestroy {
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    const clicked = this.filteredBottles().find(bottle => {
-      const waveOffset = Math.sin(bottle.pulse || 0) * 8;
-      const bY = bottle.y + waveOffset;
-      const dist = Math.sqrt((clickX - bottle.x) ** 2 + (clickY - bY) ** 2);
-      return dist < 30;
+    const clicked = this.wishes().find(wish => {
+      const dist = Math.sqrt((clickX - wish.x) ** 2 + (clickY - wish.y) ** 2);
+      return dist < 35;
     });
 
     if (clicked) {
       this.playSound('uncork');
-      this.selectedBottle.set(clicked);
+      this.selectedWish.set(clicked);
     }
   }
 
-  handleLaunchBottle() {
+  // Sketchpad trigger modal open hook
+  openWriteModal() {
+    this.showWriteModal.set(true);
+    setTimeout(() => this.initSketchpad(), 100);
+  }
+
+  initSketchpad() {
+    this.sketchCanvas = document.getElementById('sketchCanvas') as HTMLCanvasElement;
+    if (!this.sketchCanvas) return;
+    this.sketchCtx = this.sketchCanvas.getContext('2d');
+    this.strokes = [];
+    this.redrawSketchpad();
+  }
+
+  // Sketch Drawing Listeners
+  startDrawing(e: MouseEvent) {
+    if (!this.sketchCanvas) return;
+    const rect = this.sketchCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    this.isDrawing = true;
+    this.strokes.push([[x, y]]);
+  }
+
+  draw(e: MouseEvent) {
+    if (!this.isDrawing || !this.sketchCanvas) return;
+    const rect = this.sketchCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const active = this.strokes[this.strokes.length - 1];
+    active.push([x, y]);
+    this.redrawSketchpad();
+  }
+
+  stopDrawing() {
+    this.isDrawing = false;
+  }
+
+  clearDrawing() {
+    this.strokes = [];
+    this.redrawSketchpad();
+  }
+
+  setWishColor(color: string) {
+    this.wishColor = color;
+    this.redrawSketchpad();
+  }
+
+  private redrawSketchpad() {
+    const canvas = this.sketchCanvas;
+    const ctx = this.sketchCtx;
+    if (!canvas || !ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = this.wishColor;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    this.strokes.forEach(stroke => {
+      if (stroke.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(stroke[0][0], stroke[0][1]);
+      for (let i = 1; i < stroke.length; i++) {
+        ctx.lineTo(stroke[i][0], stroke[i][1]);
+      }
+      ctx.stroke();
+    });
+  }
+
+  handleLaunchWish() {
     if (!this.messageText.trim()) return;
+    if (this.strokes.length === 0) {
+      alert("Please draw a shape for your wish before casting it!");
+      return;
+    }
 
     const payload = {
       message: this.messageText,
-      bottleType: this.bottleType,
-      stoneType: this.stoneType
+      anonymousName: this.userIdentity(),
+      drawingPoints: this.strokes,
+      color: this.wishColor
     };
 
-    this.http.post<Bottle>(`${this.apiBase}/bottles`, payload).subscribe(() => {
+    this.http.post<Wish>(`${this.apiBase}/bottles`, payload).subscribe(() => {
       this.playSound('splash');
       this.messageText = '';
-      this.bottleType = 'sapphire';
-      this.stoneType = 'none';
+      this.strokes = [];
       this.showWriteModal.set(false);
-      this.fetchBottles();
+      this.fetchWishes();
     });
   }
 
   handleSendReply() {
-    if (!this.replyText.trim() || !this.selectedBottle()) return;
-    const bottleId = this.selectedBottle()?._id;
+    if (!this.replyText.trim() || !this.selectedWish()) return;
+    const wishId = this.selectedWish()?._id;
 
-    this.http.post<Bottle>(`${this.apiBase}/bottles/${bottleId}/reply`, { reply: this.replyText }).subscribe(updated => {
+    this.http.post<Wish>(`${this.apiBase}/bottles/${wishId}/reply`, { reply: this.replyText }).subscribe(updated => {
       this.replyText = '';
-      this.selectedBottle.set(updated);
-      this.fetchBottles();
+      this.selectedWish.set(updated);
+      this.fetchWishes();
     });
   }
 
-  handleSinkBottle(id: string) {
-    if (!confirm('Are you sure you want to sink this bottle forever?')) return;
+  handleSinkWish(id: string) {
+    if (!confirm('Are you sure you want to sink this wish forever?')) return;
     this.http.delete(`${this.apiBase}/bottles/${id}`).subscribe(() => {
-      this.selectedBottle.set(null);
-      this.fetchBottles();
+      this.selectedWish.set(null);
+      this.fetchWishes();
     });
+  }
+
+  toggleSound() {
+    this.soundEnabled.set(!this.soundEnabled());
+    if (this.soundEnabled()) {
+      this.playSound('splash');
+    }
   }
 
   playSound(type: string) {
@@ -368,27 +380,20 @@ export class App implements OnInit, OnDestroy {
       gain.connect(audioCtx.destination);
       
       if (type === 'splash') {
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.5);
+        osc.stop(audioCtx.currentTime + 0.6);
       } else if (type === 'uncork') {
-        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
+        osc.stop(audioCtx.currentTime + 0.12);
       }
     } catch (e) {}
-  }
-
-  toggleSound() {
-    this.soundEnabled.set(!this.soundEnabled());
-    if (this.soundEnabled()) {
-      this.playSound('splash');
-    }
   }
 }

@@ -2,12 +2,15 @@ const mongoose = require('mongoose');
 
 const bottleSchema = new mongoose.Schema({
   message: { type: String, required: true },
-  bottleType: { type: String, required: true }, // sapphire, emerald, amber, rose
-  stoneType: { type: String, default: 'none' }, // amethyst, aquamarine, citrine, none
-  replies: [{ type: String }], // reply scroll chain
-  x: { type: Number, required: true }, // float position X
-  y: { type: Number, required: true }, // float position Y
-  speed: { type: Number, required: true } // float speed
+  anonymousName: { type: String, required: true },
+  drawingPoints: { type: mongoose.Schema.Types.Mixed, required: true }, // Array of stroke arrays [[[x, y], [x, y]], ...]
+  color: { type: String, required: true }, // glowing color hex/hsl
+  x: { type: Number, required: true },
+  y: { type: Number, required: true },
+  speed: { type: Number, required: true },
+  angle: { type: Number, required: true },
+  rotationSpeed: { type: Number, required: true },
+  replies: [{ type: String }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Bottle', bottleSchema);

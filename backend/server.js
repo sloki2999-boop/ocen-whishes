@@ -81,19 +81,22 @@ app.get('/api/bottles', async (req, res) => {
 // POST /api/bottles
 app.post('/api/bottles', async (req, res) => {
   try {
-    const { message, bottleType, stoneType } = req.body;
-    if (!message || !bottleType) {
-      return res.status(400).json({ error: 'Message and bottleType are required.' });
+    const { message, anonymousName, drawingPoints, color } = req.body;
+    if (!message || !anonymousName || !drawingPoints || !color) {
+      return res.status(400).json({ error: 'Message, anonymousName, drawingPoints, and color are required.' });
     }
 
     const payload = {
       message,
-      bottleType,
-      stoneType: stoneType || 'none',
+      anonymousName,
+      drawingPoints,
+      color,
       replies: [],
       x: Math.random() * 80 + 10,
       y: Math.random() * 50 + 25,
-      speed: Math.random() * 0.1 + 0.05
+      speed: Math.random() * 0.1 + 0.05,
+      angle: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() * 0.01) - 0.005
     };
 
     if (!dbConnected) {

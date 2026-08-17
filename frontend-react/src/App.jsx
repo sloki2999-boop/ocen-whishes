@@ -9,101 +9,96 @@ import {
   VolumeX,
   PlusCircle,
   X,
-  Filter
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 
 const API_BASE = 'https://task-management-mern-mean.vercel.app/api';
 
+const ADJECTIVES = ["Glowing", "Silent", "Nebula", "Ethereal", "Whispering", "Sunken", "Cosmic", "Golden", "Mystic", "Drifting", "Prismatic", "Gentle"];
+const MARINE_NOUNS = ["Seaglass", "Coral", "Anemone", "Seahorse", "Dolphin", "Manta", "Jellyfish", "Nautilus", "Current", "Pearl", "Lagoon", "Shell"];
+
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#d946ef", "#06b6d4"];
+
 function App() {
-  const [bottles, setBottles] = useState([]);
-  const [selectedBottle, setSelectedBottle] = useState(null);
+  const [wishes, setWishes] = useState([]);
+  const [selectedWish, setSelectedWish] = useState(null);
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(false);
-
-  // Filters
-  const [activeFilter, setActiveFilter] = useState('all'); // all, amethyst, aquamarine, citrine, none
+  const [userIdentity, setUserIdentity] = useState('');
 
   // Form states
   const [messageText, setMessageText] = useState('');
-  const [bottleType, setBottleType] = useState('sapphire'); // sapphire, emerald, amber, rose
-  const [stoneType, setStoneType] = useState('none'); // amethyst, aquamarine, citrine, none
+  const [wishColor, setWishColor] = useState(COLORS[0]); // Neon hex colors
   const [replyText, setReplyText] = useState('');
+  
+  // Drawing states
+  const [strokes, setStrokes] = useState([]); // Array of stroke arrays [[[x,y], [x,y]], ...]
+  const [isDrawing, setIsDrawing] = useState(false);
+  const drawingCanvasRef = useRef(null);
 
-  // Audio Context (Mock sound synthesis since we cannot load local mp3s reliably)
+  // Initialize identity
+  useEffect(() => {
+    let stored = localStorage.getItem('ocean_wisher_identity');
+    if (!stored) {
+      const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+      const noun = MARINE_NOUNS[Math.floor(Math.random() * MARINE_NOUNS.length)];
+      stored = `${adj} ${noun}`;
+      localStorage.setItem('ocean_wisher_identity', stored);
+    }
+    setUserIdentity(stored);
+    fetchWishes();
+  }, []);
+
   const playSound = (type) => {
     if (!soundEnabled) return;
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
       if (type === 'splash') {
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.5);
+        osc.stop(audioCtx.currentTime + 0.6);
       } else if (type === 'uncork') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-      } else if (type === 'ambient') {
-        // Soft white noise wave
-        const bufferSize = audioCtx.sampleRate * 2;
-        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const output = noiseBuffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          output[i] = Math.random() * 2 - 1;
-        }
-        const whiteNoise = audioCtx.createBufferSource();
-        whiteNoise.buffer = noiseBuffer;
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 400;
-        
-        whiteNoise.connect(filter);
-        filter.connect(gain);
-        gain.connect(audioCtx.destination);
-        
-        gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 1);
-        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 2);
-        
-        whiteNoise.start();
+        osc.stop(audioCtx.currentTime + 0.12);
       }
-    } catch (e) {
-      console.warn('Audio synthesis failed:', e);
-    }
+    } catch (e) {}
   };
 
   const canvasRef = useRef(null);
-  const bottlesRef = useRef([]);
+  const wishesRef = useRef([]);
 
-  // Fetch bottles
-  const fetchBottles = async () => {
+  // Fetch wishes from backend
+  const fetchWishes = async () => {
     try {
       const res = await fetch(`${API_BASE}/bottles`);
       const data = await res.json();
-      setBottles(data);
+      setWishes(data);
       
-      // Update canvas bottles reference preserving visual states if possible
-      bottlesRef.current = data.map(b => {
-        const existing = bottlesRef.current.find(eb => eb._id === b._id);
+      // Map to local coordinates and render properties
+      wishesRef.current = data.map(w => {
+        const existing = wishesRef.current.find(ew => ew._id === w._id);
         return {
-          ...b,
-          x: existing ? existing.x : (b.x / 100) * (canvasRef.current ? canvasRef.current.width : window.innerWidth),
-          y: existing ? existing.y : (b.y / 100) * (canvasRef.current ? canvasRef.current.height : window.innerHeight),
-          angle: existing ? existing.angle : Math.random() * Math.PI * 2,
+          ...w,
+          x: existing ? existing.x : (w.x / 100) * window.innerWidth,
+          y: existing ? existing.y : (w.y / 100) * window.innerHeight,
+          angle: existing ? existing.angle : w.angle || Math.random() * Math.PI * 2,
+          rotationSpeed: existing ? existing.rotationSpeed : w.rotationSpeed || (Math.random() * 0.006 - 0.003),
           pulse: Math.random() * Math.PI,
           bubbles: existing ? existing.bubbles : []
         };
@@ -115,20 +110,7 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    fetchBottles();
-    // Poll every 10 seconds to keep synced
-    const interval = setInterval(fetchBottles, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Sync canvas bottles list when filter changes
-  const filteredBottles = bottlesRef.current.filter(b => {
-    if (activeFilter === 'all') return true;
-    return b.stoneType === activeFilter;
-  });
-
-  // Canvas render loop
+  // Canvas Top-Down Ocean Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -142,181 +124,92 @@ function App() {
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Star data
-    const stars = Array.from({ length: 80 }, () => ({
+    // Ambient floating particles (phytoplankton / bubbles)
+    const particles = Array.from({ length: 50 }, () => ({
       x: Math.random() * window.innerWidth,
-      y: Math.random() * (window.innerHeight * 0.4),
-      size: Math.random() * 1.5 + 0.5,
-      twinkle: Math.random() * Math.PI
+      y: Math.random() * window.innerHeight,
+      size: Math.random() * 2 + 1,
+      speedY: -(Math.random() * 0.4 + 0.2),
+      speedX: (Math.random() * 0.2 - 0.1),
+      alpha: Math.random() * 0.5 + 0.2
     }));
 
     const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // 1. Draw Sky Gradient
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
-      skyGrad.addColorStop(0, '#060a13');
-      skyGrad.addColorStop(0.5, '#0b1325');
-      skyGrad.addColorStop(1, '#16223f');
-      ctx.fillStyle = skyGrad;
+      // 1. Draw Deep Water Gradient Background
+      const waterGrad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      waterGrad.addColorStop(0, '#020617');
+      waterGrad.addColorStop(0.5, '#07152e');
+      waterGrad.addColorStop(1, '#020d22');
+      ctx.fillStyle = waterGrad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // 2. Draw Stars
-      ctx.fillStyle = '#ffffff';
-      stars.forEach(star => {
-        star.twinkle += 0.02;
-        const opacity = (Math.sin(star.twinkle) + 1) / 2 * 0.8 + 0.2;
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+      // 2. Draw Gentle Water Ripple Grid (Top View Waves)
+      const now = Date.now();
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.03)';
+      ctx.lineWidth = 1;
+      const rippleSize = 80;
+      for (let x = 0; x < canvas.width; x += rippleSize) {
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        for (let y = 0; y < canvas.height; y += 10) {
+          const shift = Math.sin(y * 0.01 + now * 0.001) * 8;
+          ctx.lineTo(x + shift, y);
+        }
+        ctx.stroke();
+      }
+
+      // 3. Draw Ambient Phytoplankton Particles
+      particles.forEach(p => {
+        p.y += p.speedY;
+        p.x += p.speedX;
+        if (p.y < -10) {
+          p.y = canvas.height + 10;
+          p.x = Math.random() * canvas.width;
+        }
+        ctx.fillStyle = `rgba(34, 211, 238, ${p.alpha * (0.3 + 0.3 * Math.sin(now * 0.001))})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // 3. Draw Glowing Moon
-      const moonX = canvas.width * 0.8;
-      const moonY = canvas.height * 0.15;
-      const moonGlow = ctx.createRadialGradient(moonX, moonY, 10, moonX, moonY, 80);
-      moonGlow.addColorStop(0, 'rgba(255, 253, 245, 0.4)');
-      moonGlow.addColorStop(0.5, 'rgba(235, 245, 255, 0.1)');
-      moonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = moonGlow;
-      ctx.beginPath();
-      ctx.arc(moonX, moonY, 80, 0, Math.PI * 2);
-      ctx.fill();
+      // 4. Update and Draw Floating Vector Shapes
+      wishesRef.current.forEach(wish => {
+        // Apply physics drift (flow to the right/upwards)
+        wish.x += wish.speed * 0.3;
+        wish.y += Math.sin(now * 0.0005 + wish.pulse) * 0.05; // gentle bobbing
+        wish.angle += wish.rotationSpeed; // rotation
 
-      ctx.fillStyle = '#fffdf0';
-      ctx.beginPath();
-      ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 4. Update and Draw Floating Bottles
-      const now = Date.now();
-      bottlesRef.current.forEach(bottle => {
-        // Check filter
-        if (activeFilter !== 'all' && bottle.stoneType !== activeFilter) return;
-
-        // Update coordinates (drift slowly to the right)
-        bottle.x += bottle.speed;
-        if (bottle.x > canvas.width + 40) {
-          bottle.x = -40;
-          bottle.y = Math.random() * (canvas.height * 0.5) + (canvas.height * 0.3);
+        if (wish.x > canvas.width + 60) {
+          wish.x = -60;
+          wish.y = Math.random() * canvas.height;
         }
 
-        // Float wave oscillation
-        bottle.pulse += 0.015;
-        const waveOffset = Math.sin(bottle.pulse) * 8;
-        const currentY = bottle.y + waveOffset;
+        // Draw glowing halos
+        ctx.save();
+        ctx.translate(wish.x, wish.y);
+        ctx.rotate(wish.angle);
+        ctx.scale(0.35, 0.35); // Scale down 200x200 drawing canvas coordinates
+        ctx.translate(-100, -100); // Center around origin
 
-        // Generate tiny rising bubbles from the bottle
-        if (Math.random() < 0.03) {
-          bottle.bubbles.push({
-            x: bottle.x + (Math.random() * 20 - 10),
-            y: currentY,
-            size: Math.random() * 2 + 1,
-            speedY: Math.random() * 0.5 + 0.3,
-            opacity: 1
-          });
-        }
+        // Draw drawing paths
+        ctx.strokeStyle = wish.color;
+        ctx.shadowColor = wish.color;
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-        // Draw bubbles
-        bottle.bubbles.forEach((bubble, idx) => {
-          bubble.y -= bubble.speedY;
-          bubble.opacity -= 0.005;
-          if (bubble.opacity <= 0) {
-            bottle.bubbles.splice(idx, 1);
-            return;
-          }
-          ctx.fillStyle = `rgba(255, 255, 255, ${bubble.opacity * 0.4})`;
+        wish.drawingPoints.forEach(stroke => {
+          if (stroke.length < 2) return;
           ctx.beginPath();
-          ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.moveTo(stroke[0][0], stroke[0][1]);
+          for (let i = 1; i < stroke.length; i++) {
+            ctx.lineTo(stroke[i][0], stroke[i][1]);
+          }
+          ctx.stroke();
         });
 
-        // Set bottle neon glows based on color type
-        let glowColor = '#3b82f6'; // sapphire
-        if (bottle.bottleType === 'emerald') glowColor = '#10b981';
-        else if (bottle.bottleType === 'amber') glowColor = '#f59e0b';
-        else if (bottle.bottleType === 'rose') glowColor = '#ec4899';
-
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = glowColor;
-
-        // Draw glowing stone attachment if present
-        if (bottle.stoneType && bottle.stoneType !== 'none') {
-          let stoneGlow = '#d946ef'; // amethyst
-          if (bottle.stoneType === 'aquamarine') stoneGlow = '#06b6d4';
-          else if (bottle.stoneType === 'citrine') stoneGlow = '#eab308';
-          
-          ctx.fillStyle = stoneGlow;
-          ctx.shadowColor = stoneGlow;
-          ctx.beginPath();
-          ctx.arc(bottle.x, currentY + 12, 5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Draw Bottle Body
-        ctx.fillStyle = glowColor;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
-
-        // Bottle silhouette
-        ctx.beginPath();
-        // Neck
-        ctx.moveTo(bottle.x - 4, currentY - 15);
-        ctx.lineTo(bottle.x + 4, currentY - 15);
-        ctx.lineTo(bottle.x + 4, currentY - 8);
-        // Shoulders
-        ctx.bezierCurveTo(bottle.x + 10, currentY - 8, bottle.x + 12, currentY - 3, bottle.x + 12, currentY);
-        // Body
-        ctx.lineTo(bottle.x + 10, currentY + 15);
-        // Base
-        ctx.bezierCurveTo(bottle.x + 10, currentY + 22, bottle.x - 10, currentY + 22, bottle.x - 10, currentY + 15);
-        // Left side
-        ctx.lineTo(bottle.x - 12, currentY);
-        ctx.bezierCurveTo(bottle.x - 12, currentY - 3, bottle.x - 10, currentY - 8, bottle.x - 4, currentY - 8);
-        ctx.closePath();
-
-        // Fill with slight semi-transparency
-        ctx.fillStyle = `rgba(${parseInt(glowColor.substr(1,2),16)}, ${parseInt(glowColor.substr(3,2),16)}, ${parseInt(glowColor.substr(5,2),16)}, 0.15)`;
-        ctx.fill();
-        ctx.stroke();
-
-        // Draw cork
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#a16207'; // Cork brown
-        ctx.fillRect(bottle.x - 3, currentY - 18, 6, 4);
+        ctx.restore();
       });
-
-      // 5. Draw Parallax Ocean Waves (Foreground overlay)
-      const waveGrad1 = ctx.createLinearGradient(0, canvas.height * 0.4, 0, canvas.height);
-      waveGrad1.addColorStop(0, 'rgba(10, 24, 53, 0.4)');
-      waveGrad1.addColorStop(1, 'rgba(5, 12, 28, 0.9)');
-
-      ctx.fillStyle = waveGrad1;
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height);
-      for (let i = 0; i <= canvas.width; i += 20) {
-        const y = Math.sin(i * 0.003 + now * 0.0006) * 15 + canvas.height * 0.55;
-        ctx.lineTo(i, y);
-      }
-      ctx.lineTo(canvas.width, canvas.height);
-      ctx.closePath();
-      ctx.fill();
-
-      const waveGrad2 = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
-      waveGrad2.addColorStop(0, 'rgba(12, 34, 76, 0.5)');
-      waveGrad2.addColorStop(1, 'rgba(4, 9, 21, 0.95)');
-
-      ctx.fillStyle = waveGrad2;
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height);
-      for (let i = 0; i <= canvas.width; i += 20) {
-        const y = Math.cos(i * 0.004 - now * 0.0008) * 12 + canvas.height * 0.65;
-        ctx.lineTo(i, y);
-      }
-      ctx.lineTo(canvas.width, canvas.height);
-      ctx.closePath();
-      ctx.fill();
 
       animationId = requestAnimationFrame(render);
     };
@@ -327,9 +220,9 @@ function App() {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [activeFilter]);
+  }, [wishes]);
 
-  // Click on Canvas to catch bottle
+  // Click on main canvas to open a floating vector shape
   const handleCanvasClick = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -338,28 +231,85 @@ function App() {
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // Check hit boxes
-    const clicked = bottlesRef.current.find(bottle => {
-      // Filter check
-      if (activeFilter !== 'all' && bottle.stoneType !== activeFilter) return false;
-
-      const waveOffset = Math.sin(bottle.pulse) * 8;
-      const bY = bottle.y + waveOffset;
-
-      const dist = Math.sqrt((clickX - bottle.x) ** 2 + (clickY - bY) ** 2);
-      return dist < 30; // 30px click radius
+    const clicked = wishesRef.current.find(wish => {
+      const dist = Math.sqrt((clickX - wish.x) ** 2 + (clickY - wish.y) ** 2);
+      return dist < 35; // 35px click bounds
     });
 
     if (clicked) {
       playSound('uncork');
-      setSelectedBottle(clicked);
+      setSelectedWish(clicked);
     }
   };
 
-  // Launch a bottle
-  const handleLaunchBottle = async (e) => {
+  // Drawing Pad Event Handlers
+  const startDrawing = (e) => {
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setIsDrawing(true);
+    setStrokes(prev => [...prev, [[x, y]]]);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setStrokes(prev => {
+      const next = [...prev];
+      const active = next[next.length - 1];
+      active.push([x, y]);
+      return next;
+    });
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  // Redraw the sketchpad preview
+  useEffect(() => {
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = wishColor;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    strokes.forEach(stroke => {
+      if (stroke.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(stroke[0][0], stroke[0][1]);
+      for (let i = 1; i < stroke.length; i++) {
+        ctx.lineTo(stroke[i][0], stroke[i][1]);
+      }
+      ctx.stroke();
+    });
+  }, [strokes, wishColor]);
+
+  // Clear sketchpad
+  const clearDrawing = () => {
+    setStrokes([]);
+  };
+
+  // Seal & Cast Wish
+  const handleLaunchWish = async (e) => {
     e.preventDefault();
     if (!messageText.trim()) return;
+    if (strokes.length === 0) {
+      alert("Please draw an imaginable shape for your wish before throwing it!");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/bottles`, {
@@ -367,31 +317,31 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageText,
-          bottleType,
-          stoneType
+          anonymousName: userIdentity,
+          drawingPoints: strokes,
+          color: wishColor
         })
       });
 
       if (res.ok) {
         playSound('splash');
         setMessageText('');
-        setBottleType('sapphire');
-        setStoneType('none');
+        setStrokes([]);
         setShowWriteModal(false);
-        await fetchBottles();
+        await fetchWishes();
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Submit a reply
+  // Reply to Wish Scroll
   const handleSendReply = async (e) => {
     e.preventDefault();
-    if (!replyText.trim() || !selectedBottle) return;
+    if (!replyText.trim() || !selectedWish) return;
 
     try {
-      const res = await fetch(`${API_BASE}/bottles/${selectedBottle._id}/reply`, {
+      const res = await fetch(`${API_BASE}/bottles/${selectedWish._id}/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reply: replyText })
@@ -400,21 +350,17 @@ function App() {
       if (res.ok) {
         setReplyText('');
         const updated = await res.json();
-        
-        // Update selected bottle in state
-        setSelectedBottle(updated);
-        
-        // Refresh items in background
-        await fetchBottles();
+        setSelectedWish(updated);
+        await fetchWishes();
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Sink bottle (delete)
-  const handleSinkBottle = async (id) => {
-    if (!confirm('Are you sure you want to sink this bottle to the deep dark sea forever?')) return;
+  // Sink Wish
+  const handleSinkWish = async (id) => {
+    if (!confirm('Are you sure you want to sink this wish to the deep dark sea floor?')) return;
 
     try {
       const res = await fetch(`${API_BASE}/bottles/${id}`, {
@@ -422,8 +368,8 @@ function App() {
       });
 
       if (res.ok) {
-        setSelectedBottle(null);
-        await fetchBottles();
+        setSelectedWish(null);
+        await fetchWishes();
       }
     } catch (err) {
       console.error(err);
@@ -432,26 +378,32 @@ function App() {
 
   return (
     <div className="ocean-app">
-      {/* Stars Canvas Background */}
+      {/* Top-Down Rippling Canvas */}
       <canvas 
         ref={canvasRef} 
         onClick={handleCanvasClick}
         className="ocean-canvas"
       />
 
-      {/* Floating UI Elements */}
+      {/* Interface HUD overlay */}
       <div className="ui-overlay">
         <header className="ocean-header">
           <div className="brand flex items-center gap-2">
             <Compass className="brand-logo animate-spin-slow" />
             <div>
               <h1>Ocean Wisher</h1>
-              <p className="sub">Deep Ocean Message Bottles</p>
+              <p className="sub font-mono">Drifting anonymous wishes</p>
             </div>
           </div>
 
           <div className="audio-and-filters">
-            {/* Soft music toggle */}
+            {/* Identity display */}
+            <div className="user-profile flex items-center gap-2">
+              <Sparkles size={14} className="text-cyan-400" />
+              <span>You are: <strong className="text-cyan-200">{userIdentity}</strong></span>
+            </div>
+
+            {/* Audio toggle */}
             <button 
               onClick={() => {
                 setSoundEnabled(!soundEnabled);
@@ -462,151 +414,130 @@ function App() {
             >
               {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
-
-            {/* Filter buttons */}
-            <div className="filter-bar">
-              <button 
-                onClick={() => setActiveFilter('all')} 
-                className={`filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
-              >
-                All Currents
-              </button>
-              <button 
-                onClick={() => setActiveFilter('amethyst')} 
-                className={`filter-btn amethyst ${activeFilter === 'amethyst' ? 'active' : ''}`}
-              >
-                Amethyst
-              </button>
-              <button 
-                onClick={() => setActiveFilter('aquamarine')} 
-                className={`filter-btn aquamarine ${activeFilter === 'aquamarine' ? 'active' : ''}`}
-              >
-                Aquamarine
-              </button>
-              <button 
-                onClick={() => setActiveFilter('citrine')} 
-                className={`filter-btn citrine ${activeFilter === 'citrine' ? 'active' : ''}`}
-              >
-                Citrine
-              </button>
-            </div>
           </div>
         </header>
 
-        {/* Instructions */}
+        {/* Info */}
         <div className="ocean-info-toast">
           <HelpCircle size={14} />
-          <span>Click a drifting glowing bottle to pull it in and read its secret scroll.</span>
+          <span>Click any floating glowing drawing to view the wish scroll.</span>
         </div>
 
-        {/* Launch button */}
+        {/* Launch Trigger */}
         <button 
           onClick={() => setShowWriteModal(true)} 
           className="btn-launch-bottle flex items-center gap-2"
         >
           <PlusCircle size={20} />
-          <span>Cast a Bottle into the Sea</span>
+          <span>Cast a Wish into the Sea</span>
         </button>
       </div>
 
-      {/* Write Bottle Modal */}
+      {/* Write Wish Modal */}
       {showWriteModal && (
         <div className="backdrop fade-in">
-          <div className="paper-modal scroll-parchment">
+          <div className="paper-modal scroll-parchment flex flex-col md:flex-row gap-6 max-w-3xl">
             <button onClick={() => setShowWriteModal(false)} className="close-btn">
               <X size={20} />
             </button>
             
-            <form onSubmit={handleLaunchBottle} className="parchment-form">
-              <h2>Write your Secret Message</h2>
-              <p className="form-sub">Write a dream, a confession, or an anonymous note to the universe.</p>
+            <form onSubmit={handleLaunchWish} className="parchment-form w-full flex flex-col md:flex-row gap-6">
               
-              <textarea 
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Write your note here... (it will drift anonymously in the cosmic currents)"
-                maxLength={400}
-                required
-              />
+              {/* Left Column: Form Text */}
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                  <h2>Make a Wish</h2>
+                  <p className="form-sub text-left">Write your dream. It will drift anonymously alongside your custom hand-drawn vector shape.</p>
+                  
+                  <textarea 
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Write your wish onto this scroll... (anonymously)"
+                    maxLength={350}
+                    required
+                  />
+                </div>
 
-              <div className="form-settings">
-                <div className="setting-group">
-                  <label>Bottle Essence (Color)</label>
-                  <div className="bottle-selectors">
-                    {['sapphire', 'emerald', 'amber', 'rose'].map(type => (
+                <div className="form-settings mt-auto">
+                  <label className="text-xs uppercase font-bold text-amber-900 block mb-2">Select Glow Color</label>
+                  <div className="color-palette flex gap-2 mb-4">
+                    {COLORS.map(c => (
                       <button
-                        key={type}
+                        key={c}
                         type="button"
-                        onClick={() => setBottleType(type)}
-                        className={`bottle-select-btn ${type} ${bottleType === type ? 'selected' : ''}`}
-                      >
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </button>
+                        onClick={() => setWishColor(c)}
+                        style={{ backgroundColor: c, border: wishColor === c ? '2px solid #5c4033' : 'none' }}
+                        className="color-dot"
+                      />
                     ))}
                   </div>
-                </div>
-
-                <div className="setting-group">
-                  <label>Attach Glowing Stone (Energy)</label>
-                  <select 
-                    value={stoneType} 
-                    onChange={(e) => setStoneType(e.target.value)}
-                  >
-                    <option value="none">None</option>
-                    <option value="amethyst">Amethyst (Purple)</option>
-                    <option value="aquamarine">Aquamarine (Blue)</option>
-                    <option value="citrine">Citrine (Yellow)</option>
-                  </select>
+                  <button type="submit" className="btn-cast w-full flex items-center justify-center gap-2">
+                    <Send size={16} /> Throw into Ocean
+                  </button>
                 </div>
               </div>
 
-              <div className="form-actions text-center">
-                <button type="submit" className="btn-cast flex items-center gap-2">
-                  <Send size={16} /> Seal & Launch Bottle
+              {/* Right Column: Sketchpad Canvas */}
+              <div className="flex flex-col items-center justify-center border-l border-amber-900/10 pl-6">
+                <label className="text-xs uppercase font-bold text-amber-900 mb-2">Draw your Imaginable Shape</label>
+                
+                <canvas
+                  ref={drawingCanvasRef}
+                  width="200"
+                  height="200"
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  className="sketchpad"
+                />
+
+                <button 
+                  type="button"
+                  onClick={clearDrawing} 
+                  className="btn-clear flex items-center gap-1 mt-2 text-xs uppercase font-bold"
+                >
+                  <RotateCcw size={12} /> Clear Canvas
                 </button>
               </div>
+
             </form>
           </div>
         </div>
       )}
 
-      {/* Read Bottle Modal */}
-      {selectedBottle && (
+      {/* Read Wish Modal */}
+      {selectedWish && (
         <div className="backdrop fade-in">
           <div className="paper-modal scroll-parchment read-mode">
-            <button onClick={() => setSelectedBottle(null)} className="close-btn">
+            <button onClick={() => setSelectedWish(null)} className="close-btn">
               <X size={20} />
             </button>
 
             <div className="parchment-content">
-              <div className="bottle-meta">
-                <span className={`glow-indicator ${selectedBottle.bottleType}`}>
-                  {selectedBottle.bottleType} Essence
+              <div className="bottle-meta flex items-center justify-between border-b border-amber-900/10 pb-2 mb-3">
+                <span className="anonymous-author font-semibold">
+                  By: ~ {selectedWish.anonymousName}
                 </span>
-                {selectedBottle.stoneType && selectedBottle.stoneType !== 'none' && (
-                  <span className={`stone-indicator ${selectedBottle.stoneType}`}>
-                    {selectedBottle.stoneType} stone attached
-                  </span>
-                )}
                 <span className="date-tag">
-                  Drifting since {new Date(selectedBottle.createdAt).toLocaleDateString()}
+                  {new Date(selectedWish.createdAt).toLocaleDateString()}
                 </span>
               </div>
 
-              {/* Message */}
+              {/* Message text */}
               <div className="bottle-scroll-text">
-                <p className="main-message">"{selectedBottle.message}"</p>
+                <p className="main-message">"{selectedWish.message}"</p>
               </div>
 
-              {/* Replies Section */}
+              {/* Replies History */}
               <div className="replies-section">
-                <h3>Scroll Reply History ({selectedBottle.replies?.length || 0})</h3>
+                <h3>Scroll Reply History ({selectedWish.replies?.length || 0})</h3>
                 
                 <div className="replies-list">
-                  {selectedBottle.replies?.length === 0 ? (
-                    <p className="empty-replies">No replies written on this scroll yet. Be the first...</p>
+                  {selectedWish.replies?.length === 0 ? (
+                    <p className="empty-replies">This scroll is empty. Leave a response to float with it...</p>
                   ) : (
-                    selectedBottle.replies.map((reply, index) => (
+                    selectedWish.replies.map((reply, index) => (
                       <div key={index} className="reply-item">
                         <MessageSquare size={14} className="text-muted" />
                         <p>{reply}</p>
@@ -630,24 +561,24 @@ function App() {
                 </form>
               </div>
 
-              {/* Actions */}
-              <div className="scroll-footer flex justify-between items-center mt-4">
+              {/* Actions Footer */}
+              <div className="scroll-footer flex justify-between items-center mt-6 pt-3 border-t border-amber-900/10">
                 <button 
-                  onClick={() => handleSinkBottle(selectedBottle._id)} 
+                  onClick={() => handleSinkWish(selectedWish._id)} 
                   className="btn-sink flex items-center gap-1"
                   title="Sink Bottle"
                 >
-                  <Trash2 size={14} /> Sink Bottle
+                  <Trash2 size={14} /> Sink Wish
                 </button>
 
                 <button 
                   onClick={() => {
                     playSound('splash');
-                    setSelectedBottle(null);
+                    setSelectedWish(null);
                   }} 
                   className="btn-toss"
                 >
-                  Toss back into the sea
+                  Toss back in ocean
                 </button>
               </div>
             </div>

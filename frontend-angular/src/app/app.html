@@ -29,11 +29,17 @@
         <svg class="brand-logo animate-spin-slow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
         <div>
           <h1>Ocean Wisher</h1>
-          <p className="sub">Deep Ocean Message Bottles</p>
+          <p class="sub font-mono">Drifting anonymous wishes</p>
         </div>
       </div>
 
       <div class="audio-and-filters">
+        <!-- User identity display -->
+        <div class="user-profile flex items-center gap-2">
+          <svg class="text-cyan-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>
+          <span>You are: <strong class="text-cyan-200">{{userIdentity()}}</strong></span>
+        </div>
+
         <!-- Audio toggle -->
         <button 
           (click)="toggleSound()" 
@@ -43,146 +49,125 @@
           <svg *ngIf="soundEnabled()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
           <svg *ngIf="!soundEnabled()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
         </button>
-
-        <!-- Filters -->
-        <div class="filter-bar">
-          <button 
-            (click)="activeFilter.set('all')" 
-            [class.active]="activeFilter() === 'all'" 
-            class="filter-btn"
-          >
-            All Currents
-          </button>
-          <button 
-            (click)="activeFilter.set('amethyst')" 
-            [class.active]="activeFilter() === 'amethyst'" 
-            class="filter-btn amethyst"
-          >
-            Amethyst
-          </button>
-          <button 
-            (click)="activeFilter.set('aquamarine')" 
-            [class.active]="activeFilter() === 'aquamarine'" 
-            class="filter-btn aquamarine"
-          >
-            Aquamarine
-          </button>
-          <button 
-            (click)="activeFilter.set('citrine')" 
-            [class.active]="activeFilter() === 'citrine'" 
-            class="filter-btn citrine"
-          >
-            Citrine
-          </button>
-        </div>
       </div>
     </header>
 
     <!-- Instructions Toast -->
     <div class="ocean-info-toast">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>Click a drifting glowing bottle to pull it in and read its secret scroll.</span>
+      <span>Click any floating glowing drawing to view the wish scroll.</span>
     </div>
 
     <!-- Cast Button -->
     <button 
-      (click)="showWriteModal.set(true)" 
+      (click)="openWriteModal()" 
       class="btn-launch-bottle flex items-center gap-2"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="12" y2="12"/></svg>
-      <span>Cast a Bottle into the Sea</span>
+      <span>Cast a Wish into the Sea</span>
     </button>
   </div>
 
-  <!-- Write Bottle Modal -->
+  <!-- Write Wish Modal -->
   <div *ngIf="showWriteModal()" class="backdrop fade-in">
-    <div class="paper-modal scroll-parchment">
+    <div class="paper-modal scroll-parchment max-w-3xl flex flex-col md:flex-row gap-6">
       <button (click)="showWriteModal.set(false)" class="close-btn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
 
-      <form (submit)="handleLaunchBottle()" class="parchment-form">
-        <h2>Write your Secret Message</h2>
-        <p class="form-sub">Write a dream, a confession, or an anonymous note to the universe.</p>
+      <form (submit)="handleLaunchWish()" class="parchment-form w-full flex flex-col md:flex-row gap-6">
+        
+        <!-- Left: Text details -->
+        <div class="flex-1 flex flex-col justify-between">
+          <div>
+            <h2>Make a Wish</h2>
+            <p class="form-sub text-left">Write your dream. It will drift anonymously alongside your custom hand-drawn vector shape.</p>
 
-        <textarea 
-          [(ngModel)]="messageText"
-          name="messageText"
-          placeholder="Write your note here... (it will drift anonymously in the cosmic currents)"
-          maxLength="400"
-          required
-        ></textarea>
-
-        <div class="form-settings">
-          <div class="setting-group">
-            <label>Bottle Essence (Color)</label>
-            <div class="bottle-selectors">
-              <button 
-                *ngFor="let type of ['sapphire', 'emerald', 'amber', 'rose']"
-                type="button" 
-                (click)="bottleType = type" 
-                [class.selected]="bottleType === type" 
-                class="bottle-select-btn"
-                [ngClass]="type"
-              >
-                {{type | titlecase}}
-              </button>
-            </div>
+            <textarea 
+              [(ngModel)]="messageText"
+              name="messageText"
+              placeholder="Write your wish onto this scroll... (anonymously)"
+              maxLength="350"
+              required
+            ></textarea>
           </div>
 
-          <div class="setting-group">
-            <label>Attach Glowing Stone (Energy)</label>
-            <select [(ngModel)]="stoneType" name="stoneType">
-              <option value="none">None</option>
-              <option value="amethyst">Amethyst (Purple)</option>
-              <option value="aquamarine">Aquamarine (Blue)</option>
-              <option value="citrine">Citrine (Yellow)</option>
-            </select>
+          <div class="form-settings mt-auto">
+            <label class="text-xs uppercase font-bold text-amber-900 block mb-2">Select Glow Color</label>
+            <div class="color-palette flex gap-2 mb-4">
+              <button 
+                *ngFor="let c of colors"
+                type="button" 
+                (click)="setWishColor(c)" 
+                [style.background-color]="c"
+                [style.border]="wishColor === c ? '2px solid #5c4033' : 'none'"
+                class="color-dot"
+              ></button>
+            </div>
+            <button type="submit" class="btn-cast w-full flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Throw into Ocean
+            </button>
           </div>
         </div>
 
-        <div class="form-actions text-center">
-          <button (click)="handleLaunchBottle()" type="button" class="btn-cast flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Seal & Launch Bottle
+        <!-- Right: Drawing Pad -->
+        <div class="flex flex-col items-center justify-center border-l border-amber-900/10 pl-6">
+          <label class="text-xs uppercase font-bold text-amber-900 mb-2">Draw your Imaginable Shape</label>
+          
+          <canvas
+            id="sketchCanvas"
+            width="200"
+            height="200"
+            (mousedown)="startDrawing($event)"
+            (mousemove)="draw($event)"
+            (mouseup)="stopDrawing()"
+            (mouseleave)="stopDrawing()"
+            class="sketchpad"
+          ></canvas>
+
+          <button 
+            type="button"
+            (click)="clearDrawing()" 
+            class="btn-clear flex items-center gap-1 mt-2 text-xs uppercase font-bold"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 21H3v-5"/></svg>
+            Clear Canvas
           </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Read Bottle Modal -->
-  <div *ngIf="selectedBottle()" class="backdrop fade-in">
+  <!-- Read Wish Modal -->
+  <div *ngIf="selectedWish()" class="backdrop fade-in">
     <div class="paper-modal scroll-parchment read-mode">
-      <button (click)="selectedBottle.set(null)" class="close-btn">
+      <button (click)="selectedWish.set(null)" class="close-btn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
 
       <div class="parchment-content">
-        <div class="bottle-meta">
-          <span class="glow-indicator" [ngClass]="selectedBottle()?.bottleType">
-            {{selectedBottle()?.bottleType}} Essence
-          </span>
-          <span *ngIf="selectedBottle()?.stoneType && selectedBottle()?.stoneType !== 'none'" class="stone-indicator" [ngClass]="selectedBottle()?.stoneType">
-            {{selectedBottle()?.stoneType}} stone attached
+        <div class="bottle-meta flex items-center justify-between border-b border-amber-900/10 pb-2 mb-3">
+          <span class="anonymous-author font-semibold">
+            By: ~ {{selectedWish()?.anonymousName}}
           </span>
           <span class="date-tag">
-            Drifting since {{selectedBottle()?.createdAt | date:'shortDate'}}
+            {{selectedWish()?.createdAt | date:'shortDate'}}
           </span>
         </div>
 
         <!-- Message -->
         <div class="bottle-scroll-text">
-          <p class="main-message">"{{selectedBottle()?.message}}"</p>
+          <p class="main-message">"{{selectedWish()?.message}}"</p>
         </div>
 
         <!-- Replies -->
         <div class="replies-section">
-          <h3>Scroll Reply History ({{selectedBottle()?.replies?.length || 0}})</h3>
+          <h3>Scroll Reply History ({{selectedWish()?.replies?.length || 0}})</h3>
 
           <div class="replies-list">
-            <p *ngIf="selectedBottle()?.replies?.length === 0" class="empty-replies">No replies written on this scroll yet. Be the first...</p>
-            <div *ngFor="let r of selectedBottle()?.replies" class="reply-item">
+            <p *ngIf="selectedWish()?.replies?.length === 0" class="empty-replies">This scroll is empty. Leave a response to float with it...</p>
+            <div *ngFor="let r of selectedWish()?.replies" class="reply-item">
               <svg class="text-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <p>{{r}}</p>
             </div>
@@ -204,18 +189,18 @@
         </div>
 
         <!-- Actions -->
-        <div class="scroll-footer flex justify-between items-center mt-4">
+        <div class="scroll-footer flex justify-between items-center mt-6 pt-3 border-t border-amber-900/10">
           <button 
-            *ngIf="selectedBottle()"
-            (click)="handleSinkBottle(selectedBottle()!._id)" 
+            *ngIf="selectedWish()"
+            (click)="handleSinkWish(selectedWish()!._id)" 
             class="btn-sink flex items-center gap-1"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            Sink Bottle
+            Sink Wish
           </button>
 
-          <button (click)="selectedBottle.set(null); playSound('splash')" class="btn-toss">
-            Toss back into the sea
+          <button (click)="selectedWish.set(null); playSound('splash')" class="btn-toss">
+            Toss back in ocean
           </button>
         </div>
       </div>

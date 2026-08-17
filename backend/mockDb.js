@@ -5,84 +5,71 @@ const DB_FILE = process.env.VERCEL
   ? path.join('/tmp', 'db.json')
   : path.join(__dirname, 'db.json');
 
+// Predefined vector drawings for seeding
+const starShape = [
+  [
+    [100, 20], [124, 70], [178, 78], [139, 116], [150, 170], 
+    [100, 145], [50, 170], [61, 116], [22, 78], [76, 70], [100, 20]
+  ]
+];
+
+const heartShape = [
+  [
+    [100, 50], [80, 30], [50, 30], [30, 50], [30, 80], 
+    [100, 150], [170, 80], [170, 50], [150, 30], [120, 30], [100, 50]
+  ]
+];
+
+const boatShape = [
+  // Hull
+  [[50, 130], [150, 130], [130, 160], [70, 160], [50, 130]],
+  // Mast and Sail
+  [[100, 130], [100, 40], [140, 85], [100, 100]]
+];
+
 const initialData = {
   bottles: [
     {
       _id: "bt_1",
-      message: "May you find the peace you are looking for. The ocean always listens.",
-      bottleType: "sapphire",
-      stoneType: "aquamarine",
-      replies: ["Thank you. I needed to read this today.", "Sending love back across the sea."],
+      message: "I wish I could fly among the nebulas and swim in the deep. This universe is beautiful.",
+      anonymousName: "Ethereal Seaglass",
+      drawingPoints: starShape,
+      color: "#3b82f6", // sapphire blue glow
       x: 15,
       y: 35,
       speed: 0.08,
+      angle: 0.1,
+      rotationSpeed: 0.005,
+      replies: ["Me too. Stargazing makes me feel so small but connected.", "Keep looking up!"],
       createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     },
     {
       _id: "bt_2",
-      message: "I launched this bottle from a cold beach. Even when it feels dark, the stars are still there.",
-      bottleType: "amber",
-      stoneType: "citrine",
-      replies: ["The stars are beautiful tonight. Stay strong.", "I can see them too."],
+      message: "I hope whoever finds this drawing feels loved today. You are not alone.",
+      anonymousName: "Solar Driftwood",
+      drawingPoints: heartShape,
+      color: "#ec4899", // rose pink glow
       x: 35,
       y: 55,
       speed: 0.12,
+      angle: -0.2,
+      rotationSpeed: -0.008,
+      replies: ["Thank you stranger. Warm hugs.", "Sending love from the coast."],
       createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
     },
     {
       _id: "bt_3",
-      message: "I am still in love with the person who taught me how to stargaze. I hope you are happy, wherever you are.",
-      bottleType: "rose",
-      stoneType: "amethyst",
-      replies: [],
-      x: 55,
+      message: "May your sails catch a gentle wind. Drifting along, chasing dreams.",
+      anonymousName: "Nebula Wave",
+      drawingPoints: boatShape,
+      color: "#f59e0b", // amber gold glow
+      x: 65,
       y: 40,
       speed: 0.06,
-      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      _id: "bt_4",
-      message: "I passed my coding exam today! Sending some happy energy into the currents. Keep going!",
-      bottleType: "emerald",
-      stoneType: "none",
-      replies: ["Congratulations!", "This made me smile. Thanks for sharing the joy!"],
-      x: 75,
-      y: 65,
-      speed: 0.15,
-      createdAt: new Date().toISOString()
-    },
-    {
-      _id: "bt_5",
-      message: "To whoever reads this: You are made of stardust, and the ocean is in your blood. You belong here.",
-      bottleType: "sapphire",
-      stoneType: "none",
+      angle: 0.05,
+      rotationSpeed: 0.003,
       replies: [],
-      x: 25,
-      y: 70,
-      speed: 0.07,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      _id: "bt_6",
-      message: "I miss my grandfather. I write his name in the sand every time I visit the sea. He loved the waves.",
-      bottleType: "amber",
-      stoneType: "amethyst",
-      replies: ["He is with you in every tide.", "What a beautiful memory."],
-      x: 65,
-      y: 30,
-      speed: 0.09,
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      _id: "bt_7",
-      message: "A secret: I am secretly writing a novel, and no one in my life knows. I hope one day it sits on a shelf.",
-      bottleType: "rose",
-      stoneType: "none",
-      replies: ["I would read it!", "Believe in your stories."],
-      x: 45,
-      y: 48,
-      speed: 0.10,
-      createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
     }
   ]
 };
@@ -128,9 +115,11 @@ const mockDb = {
     const newBottle = {
       _id: 'bt_' + Math.random().toString(36).substr(2, 9),
       replies: [],
-      x: Math.random() * 80 + 10, // 10% to 90%
-      y: Math.random() * 50 + 25, // 25% to 75%
+      x: Math.random() * 80 + 10,
+      y: Math.random() * 50 + 25,
       speed: Math.random() * 0.1 + 0.05,
+      angle: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() * 0.01) - 0.005,
       createdAt: new Date().toISOString(),
       ...bottleData
     };
