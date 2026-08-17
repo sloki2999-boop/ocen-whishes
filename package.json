@@ -1,5 +1,5 @@
 {
-  "name": "task-management-mern-mean-root",
+  "name": "ocean-wisher-root",
   "version": "1.0.0",
   "description": "Root package.json to redirect execution to backend server for easy cloud deployment.",
   "main": "backend/server.js",

@@ -445,7 +445,7 @@ function App() {
           <div className="brand flex items-center gap-2">
             <Compass className="brand-logo animate-spin-slow" />
             <div>
-              <h1>Cosmic Sea</h1>
+              <h1>Ocean Wisher</h1>
               <p className="sub">Deep Ocean Message Bottles</p>
             </div>
           </div>
