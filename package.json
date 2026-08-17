@@ -1,5 +1,5 @@
 {
-  "name": "ocean-wisher-root",
+  "name": "ocen-whishes-root",
   "version": "1.0.0",
   "description": "Root package.json to redirect execution to backend server for easy cloud deployment.",
   "main": "backend/server.js",
