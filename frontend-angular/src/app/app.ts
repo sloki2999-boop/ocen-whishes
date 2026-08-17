@@ -22,7 +22,7 @@ interface Wish {
 
 const ADJECTIVES = ["Glowing", "Silent", "Nebula", "Ethereal", "Whispering", "Sunken", "Cosmic", "Golden", "Mystic", "Drifting", "Prismatic", "Gentle"];
 const MARINE_NOUNS = ["Seaglass", "Coral", "Anemone", "Seahorse", "Dolphin", "Manta", "Jellyfish", "Nautilus", "Current", "Pearl", "Lagoon", "Shell"];
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#d946ef", "#06b6d4"];
+const COLORS = ["#00ffff", "#ff007f", "#d946ef", "#fbbf24", "#a3e635", "#ffffff"];
 
 @Component({
   selector: 'app-root',
@@ -103,24 +103,40 @@ export class App implements OnInit, OnDestroy {
   fetchWishes() {
     this.http.get<Wish[]>(`${this.apiBase}/bottles`).subscribe({
       next: (data) => {
-        const updated = data.map(w => {
-          const existing = this.wishes().find(ew => ew._id === w._id);
-          return {
-            ...w,
-            x: existing ? existing.x : (w.x / 100) * window.innerWidth,
-            y: existing ? existing.y : (w.y / 100) * window.innerHeight,
-            angle: existing ? existing.angle : w.angle || Math.random() * Math.PI * 2,
-            rotationSpeed: existing ? existing.rotationSpeed : w.rotationSpeed || (Math.random() * 0.006 - 0.003),
-            pulse: existing ? existing.pulse : Math.random() * Math.PI,
-            bubbles: existing ? existing.bubbles : []
-          };
-        });
-        this.wishes.set(updated);
-        this.loading.set(false);
-        setTimeout(() => this.initCanvas(), 100);
+        localStorage.setItem('wishes_cache', JSON.stringify(data));
+        this.updateWishesList(data);
       },
-      error: () => this.loading.set(false)
+      error: () => {
+        console.warn("Could not connect to live API. Falling back to local storage cached wish database.");
+        const cached = localStorage.getItem('wishes_cache');
+        const local = localStorage.getItem('local_wishes');
+
+        const cachedWishes = cached ? JSON.parse(cached) : [];
+        const localWishes = local ? JSON.parse(local) : [];
+        const combined = [...localWishes, ...cachedWishes];
+
+        const unique = Array.from(new Map(combined.map(item => [item._id, item])).values());
+        this.updateWishesList(unique);
+      }
     });
+  }
+
+  private updateWishesList(data: Wish[]) {
+    const updated = data.map(w => {
+      const existing = this.wishes().find(ew => ew._id === w._id);
+      return {
+        ...w,
+        x: existing ? existing.x : (w.x / 100) * window.innerWidth,
+        y: existing ? existing.y : (w.y / 100) * window.innerHeight,
+        angle: existing ? existing.angle : w.angle || Math.random() * Math.PI * 2,
+        rotationSpeed: existing ? existing.rotationSpeed : w.rotationSpeed || (Math.random() * 0.004 - 0.002),
+        pulse: existing ? existing.pulse : Math.random() * Math.PI,
+        bubbles: existing ? existing.bubbles : []
+      };
+    });
+    this.wishes.set(updated);
+    this.loading.set(false);
+    setTimeout(() => this.initCanvas(), 100);
   }
 
   initCanvas() {
@@ -210,15 +226,36 @@ export class App implements OnInit, OnDestroy {
       ctx.save();
       ctx.translate(wish.x, wish.y);
       ctx.rotate(wish.angle);
-      ctx.scale(0.35, 0.35);
+      ctx.scale(0.55, 0.55); // Larger floating vector shapes (approx 110px)
       ctx.translate(-100, -100);
 
+      // PASS 1: Thick Outer Bloom Glow
       ctx.strokeStyle = wish.color;
       ctx.shadowColor = wish.color;
-      ctx.shadowBlur = 18;
-      ctx.lineWidth = 6;
+      ctx.shadowBlur = 24;
+      ctx.lineWidth = 12;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      ctx.globalAlpha = 0.35;
+
+      wish.drawingPoints.forEach(stroke => {
+        if (stroke.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(stroke[0][0], stroke[0][1]);
+        for (let i = 1; i < stroke.length; i++) {
+          ctx.lineTo(stroke[i][0], stroke[i][1]);
+        }
+        ctx.stroke();
+      });
+
+      // PASS 2: Sharp Bright White Core (Starlight effect)
+      ctx.strokeStyle = '#ffffff';
+      ctx.shadowColor = wish.color;
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = 1.0;
 
       wish.drawingPoints.forEach(stroke => {
         if (stroke.length < 2) return;
@@ -287,6 +324,31 @@ export class App implements OnInit, OnDestroy {
     this.redrawSketchpad();
   }
 
+  startDrawingTouch(e: TouchEvent) {
+    e.preventDefault();
+    if (!this.sketchCanvas) return;
+    const touch = e.touches[0];
+    const rect = this.sketchCanvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    this.isDrawing = true;
+    this.strokes.push([[x, y]]);
+  }
+
+  drawTouch(e: TouchEvent) {
+    e.preventDefault();
+    if (!this.isDrawing || !this.sketchCanvas) return;
+    const touch = e.touches[0];
+    const rect = this.sketchCanvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    const active = this.strokes[this.strokes.length - 1];
+    active.push([x, y]);
+    this.redrawSketchpad();
+  }
+
   stopDrawing() {
     this.isDrawing = false;
   }
@@ -337,12 +399,40 @@ export class App implements OnInit, OnDestroy {
       color: this.wishColor
     };
 
-    this.http.post<Wish>(`${this.apiBase}/bottles`, payload).subscribe(() => {
-      this.playSound('splash');
-      this.messageText = '';
-      this.strokes = [];
-      this.showWriteModal.set(false);
-      this.fetchWishes();
+    this.http.post<Wish>(`${this.apiBase}/bottles`, payload).subscribe({
+      next: () => {
+        this.playSound('splash');
+        this.messageText = '';
+        this.strokes = [];
+        this.showWriteModal.set(false);
+        this.fetchWishes();
+      },
+      error: (err) => {
+        console.warn("API server cast failed. Storing wish locally in LocalStorage client fallback:", err);
+        const local = localStorage.getItem('local_wishes');
+        const localWishes = local ? JSON.parse(local) : [];
+
+        const newLocalWish = {
+          _id: 'local_' + Math.random().toString(36).substr(2, 9),
+          createdAt: new Date().toISOString(),
+          replies: [],
+          x: Math.random() * 80 + 10,
+          y: Math.random() * 50 + 25,
+          speed: Math.random() * 0.1 + 0.05,
+          angle: Math.random() * Math.PI * 2,
+          rotationSpeed: (Math.random() * 0.004) - 0.002,
+          ...payload
+        };
+
+        localWishes.unshift(newLocalWish);
+        localStorage.setItem('local_wishes', JSON.stringify(localWishes));
+
+        this.playSound('splash');
+        this.messageText = '';
+        this.strokes = [];
+        this.showWriteModal.set(false);
+        this.fetchWishes();
+      }
     });
   }
 

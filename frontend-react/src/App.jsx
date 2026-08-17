@@ -18,7 +18,7 @@ const API_BASE = 'https://ocen-whishes-love-8f3e.vercel.app/api';
 const ADJECTIVES = ["Glowing", "Silent", "Nebula", "Ethereal", "Whispering", "Sunken", "Cosmic", "Golden", "Mystic", "Drifting", "Prismatic", "Gentle"];
 const MARINE_NOUNS = ["Seaglass", "Coral", "Anemone", "Seahorse", "Dolphin", "Manta", "Jellyfish", "Nautilus", "Current", "Pearl", "Lagoon", "Shell"];
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#d946ef", "#06b6d4"];
+const COLORS = ["#00ffff", "#ff007f", "#d946ef", "#fbbf24", "#a3e635", "#ffffff"];
 
 function App() {
   const [wishes, setWishes] = useState([]);
@@ -164,27 +164,44 @@ function App() {
   const fetchWishes = async () => {
     try {
       const res = await fetch(`${API_BASE}/bottles`);
+      if (!res.ok) throw new Error("Backend response error");
       const data = await res.json();
-      setWishes(data);
       
-      // Map to local coordinates and render properties
-      wishesRef.current = data.map(w => {
-        const existing = wishesRef.current.find(ew => ew._id === w._id);
-        return {
-          ...w,
-          x: existing ? existing.x : (w.x / 100) * window.innerWidth,
-          y: existing ? existing.y : (w.y / 100) * window.innerHeight,
-          angle: existing ? existing.angle : w.angle || Math.random() * Math.PI * 2,
-          rotationSpeed: existing ? existing.rotationSpeed : w.rotationSpeed || (Math.random() * 0.006 - 0.003),
-          pulse: Math.random() * Math.PI,
-          bubbles: existing ? existing.bubbles : []
-        };
-      });
+      // Save data cache
+      localStorage.setItem('wishes_cache', JSON.stringify(data));
+      setWishes(data);
+      updateWishesList(data);
     } catch (err) {
-      console.error(err);
+      console.warn("Could not connect to live API server. Falling back to local storage wish database.");
+      const cached = localStorage.getItem('wishes_cache');
+      const local = localStorage.getItem('local_wishes');
+      
+      const cachedWishes = cached ? JSON.parse(cached) : [];
+      const localWishes = local ? JSON.parse(local) : [];
+      const combined = [...localWishes, ...cachedWishes];
+      
+      // De-duplicate items
+      const unique = Array.from(new Map(combined.map(item => [item._id, item])).values());
+      setWishes(unique);
+      updateWishesList(unique);
     } finally {
       setLoading(false);
     }
+  };
+
+  const updateWishesList = (data) => {
+    wishesRef.current = data.map(w => {
+      const existing = wishesRef.current.find(ew => ew._id === w._id);
+      return {
+        ...w,
+        x: existing ? existing.x : (w.x / 100) * window.innerWidth,
+        y: existing ? existing.y : (w.y / 100) * window.innerHeight,
+        angle: existing ? existing.angle : w.angle || Math.random() * Math.PI * 2,
+        rotationSpeed: existing ? existing.rotationSpeed : w.rotationSpeed || (Math.random() * 0.004 - 0.002),
+        pulse: existing ? existing.pulse : Math.random() * Math.PI,
+        bubbles: existing ? existing.bubbles : []
+      };
+    });
   };
 
   // Canvas Top-Down Ocean Render Loop
@@ -260,20 +277,40 @@ function App() {
           wish.y = Math.random() * canvas.height;
         }
 
-        // Draw glowing halos
+        // Draw drawing paths
         ctx.save();
         ctx.translate(wish.x, wish.y);
         ctx.rotate(wish.angle);
-        ctx.scale(0.35, 0.35); // Scale down 200x200 drawing canvas coordinates
+        ctx.scale(0.55, 0.55); // Larger floating drawings (approx 110px)
         ctx.translate(-100, -100); // Center around origin
 
-        // Draw drawing paths
+        // PASS 1: Thick Outer Bloom Glow
         ctx.strokeStyle = wish.color;
         ctx.shadowColor = wish.color;
-        ctx.shadowBlur = 18;
-        ctx.lineWidth = 6;
+        ctx.shadowBlur = 24;
+        ctx.lineWidth = 12;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.35;
+
+        wish.drawingPoints.forEach(stroke => {
+          if (stroke.length < 2) return;
+          ctx.beginPath();
+          ctx.moveTo(stroke[0][0], stroke[0][1]);
+          for (let i = 1; i < stroke.length; i++) {
+            ctx.lineTo(stroke[i][0], stroke[i][1]);
+          }
+          ctx.stroke();
+        });
+
+        // PASS 2: Sharp Bright White Core (Starlight effect)
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowColor = wish.color;
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 1.0;
 
         wish.drawingPoints.forEach(stroke => {
           if (stroke.length < 2) return;
@@ -347,6 +384,37 @@ function App() {
     });
   };
 
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    setIsDrawing(true);
+    setStrokes(prev => [...prev, [[x, y]]]);
+  };
+
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const touch = e.touches[0];
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    setStrokes(prev => {
+      const next = [...prev];
+      const active = next[next.length - 1];
+      active.push([x, y]);
+      return next;
+    });
+  };
+
   const stopDrawing = () => {
     setIsDrawing(false);
   };
@@ -388,16 +456,18 @@ function App() {
       return;
     }
 
+    const payload = {
+      message: messageText,
+      anonymousName: userIdentity,
+      drawingPoints: strokes,
+      color: wishColor
+    };
+
     try {
       const res = await fetch(`${API_BASE}/bottles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageText,
-          anonymousName: userIdentity,
-          drawingPoints: strokes,
-          color: wishColor
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -406,9 +476,35 @@ function App() {
         setStrokes([]);
         setShowWriteModal(false);
         await fetchWishes();
+        return;
       }
+      throw new Error("Server rejected or protected API request");
     } catch (err) {
-      console.error(err);
+      console.warn("API server cast failed. Storing wish locally to LocalStorage client fallback:", err);
+      
+      const local = localStorage.getItem('local_wishes');
+      const localWishes = local ? JSON.parse(local) : [];
+      
+      const newLocalWish = {
+        _id: 'local_' + Math.random().toString(36).substr(2, 9),
+        createdAt: new Date().toISOString(),
+        replies: [],
+        x: Math.random() * 80 + 10,
+        y: Math.random() * 50 + 25,
+        speed: Math.random() * 0.1 + 0.05,
+        angle: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() * 0.004) - 0.002,
+        ...payload
+      };
+
+      localWishes.unshift(newLocalWish);
+      localStorage.setItem('local_wishes', JSON.stringify(localWishes));
+
+      playSound('splash');
+      setMessageText('');
+      setStrokes([]);
+      setShowWriteModal(false);
+      await fetchWishes();
     }
   };
 
@@ -566,6 +662,9 @@ function App() {
                   onMouseMove={draw}
                   onMouseUp={stopDrawing}
                   onMouseLeave={stopDrawing}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={stopDrawing}
                   className="sketchpad"
                 />
 

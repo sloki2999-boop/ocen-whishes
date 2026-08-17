@@ -123,6 +123,9 @@
             (mousemove)="draw($event)"
             (mouseup)="stopDrawing()"
             (mouseleave)="stopDrawing()"
+            (touchstart)="startDrawingTouch($event)"
+            (touchmove)="drawTouch($event)"
+            (touchend)="stopDrawing()"
             class="sketchpad"
           ></canvas>
 
