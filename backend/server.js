@@ -8,7 +8,7 @@ const mockDb = require('./mockDb'); // Fallback local database
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/taskmanager';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // Middleware
 app.use(cors());
@@ -16,24 +16,29 @@ app.use(express.json());
 
 // MongoDB Connection with Auto-Seed and Fallback
 let dbConnected = false;
-mongoose.connect(MONGODB_URI, {
-  serverSelectionTimeoutMS: 3000 // Timeout fast
-})
-  .then(async () => {
-    console.log('Connected to MongoDB successfully.');
-    dbConnected = true;
-    
-    // Seed database if empty
-    const bottleCount = await Bottle.countDocuments();
-    if (bottleCount === 0) {
-      console.log('Database is empty. Seeding mock bottles...');
-      const mockBottles = mockDb.getBottles();
-      await Bottle.create(mockBottles.map(({ _id, ...rest }) => rest));
-    }
+
+if (MONGODB_URI) {
+  mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 3000 // Timeout fast
   })
-  .catch(err => {
-    console.warn('⚠️ MongoDB connection failed. Falling back to local JSON database (mockDb.js).');
-  });
+    .then(async () => {
+      console.log('Connected to MongoDB successfully.');
+      dbConnected = true;
+      
+      // Seed database if empty
+      const bottleCount = await Bottle.countDocuments();
+      if (bottleCount === 0) {
+        console.log('Database is empty. Seeding mock bottles...');
+        const mockBottles = mockDb.getBottles();
+        await Bottle.create(mockBottles.map(({ _id, ...rest }) => rest));
+      }
+    })
+    .catch(err => {
+      console.warn('⚠️ MongoDB connection failed. Falling back to local JSON database (mockDb.js).');
+    });
+} else {
+  console.log('No MONGODB_URI provided. Running in fallback JSON database mode.');
+}
 
 // Status check endpoint
 app.get('/api/status', (req, res) => {
