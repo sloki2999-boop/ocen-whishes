@@ -32,7 +32,8 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#d946ef", "#06b6d4"
 })
 export class App implements OnInit, OnDestroy {
   private http = inject(HttpClient);
-  public apiBase = 'https://task-management-mern-mean.vercel.app/api';
+  public apiBase = 'https://ocen-whishes-love-8f3e.vercel.app/api';
+  private soundNodes: any = null;
 
   // Signals
   wishes = signal<Wish[]>([]);
@@ -71,6 +72,7 @@ export class App implements OnInit, OnDestroy {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
+    this.stopAmbientSound();
   }
 
   initIdentity() {
@@ -367,6 +369,72 @@ export class App implements OnInit, OnDestroy {
     this.soundEnabled.set(!this.soundEnabled());
     if (this.soundEnabled()) {
       this.playSound('splash');
+      this.startAmbientSound();
+    } else {
+      this.stopAmbientSound();
+    }
+  }
+
+  startAmbientSound() {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const bufferSize = audioCtx.sampleRate * 4;
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const noiseSource = audioCtx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      noiseSource.loop = true;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 1;
+      filter.frequency.value = 300;
+
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.05;
+
+      const lfo = audioCtx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.08;
+
+      const lfoDepthFilter = audioCtx.createGain();
+      lfoDepthFilter.gain.value = 150;
+
+      const lfoDepthGain = audioCtx.createGain();
+      lfoDepthGain.gain.value = 0.03;
+
+      lfo.connect(lfoDepthFilter);
+      lfoDepthFilter.connect(filter.frequency);
+
+      lfo.connect(lfoDepthGain);
+      lfoDepthGain.connect(gain.gain);
+
+      noiseSource.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      noiseSource.start(0);
+      lfo.start(0);
+
+      this.soundNodes = { audioCtx, noiseSource, lfo };
+    } catch (err) {
+      console.warn("Wave synthesizer startup failed:", err);
+    }
+  }
+
+  stopAmbientSound() {
+    if (this.soundNodes) {
+      try {
+        this.soundNodes.noiseSource.stop();
+        this.soundNodes.lfo.stop();
+        this.soundNodes.audioCtx.close();
+      } catch (e) {}
+      this.soundNodes = null;
     }
   }
 

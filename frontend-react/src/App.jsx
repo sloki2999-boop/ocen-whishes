@@ -13,7 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 
-const API_BASE = 'https://task-management-mern-mean.vercel.app/api';
+const API_BASE = 'https://ocen-whishes-love-8f3e.vercel.app/api';
 
 const ADJECTIVES = ["Glowing", "Silent", "Nebula", "Ethereal", "Whispering", "Sunken", "Cosmic", "Golden", "Mystic", "Drifting", "Prismatic", "Gentle"];
 const MARINE_NOUNS = ["Seaglass", "Coral", "Anemone", "Seahorse", "Dolphin", "Manta", "Jellyfish", "Nautilus", "Current", "Pearl", "Lagoon", "Shell"];
@@ -38,6 +38,8 @@ function App() {
   const [isDrawing, setIsDrawing] = useState(false);
   const drawingCanvasRef = useRef(null);
 
+  const soundNodesRef = useRef(null);
+
   // Initialize identity
   useEffect(() => {
     let stored = localStorage.getItem('ocean_wisher_identity');
@@ -50,6 +52,81 @@ function App() {
     setUserIdentity(stored);
     fetchWishes();
   }, []);
+
+  // Web Audio Ocean Wave Synthesizer
+  useEffect(() => {
+    if (soundEnabled) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Looping noise buffer
+        const bufferSize = audioCtx.sampleRate * 4;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const noiseSource = audioCtx.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+        noiseSource.loop = true;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.Q.value = 1;
+        filter.frequency.value = 300;
+
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.05;
+
+        // Wave cycle LFO
+        const lfo = audioCtx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.08;
+
+        const lfoDepthFilter = audioCtx.createGain();
+        lfoDepthFilter.gain.value = 150;
+
+        const lfoDepthGain = audioCtx.createGain();
+        lfoDepthGain.gain.value = 0.03;
+
+        lfo.connect(lfoDepthFilter);
+        lfoDepthFilter.connect(filter.frequency);
+
+        lfo.connect(lfoDepthGain);
+        lfoDepthGain.connect(gain.gain);
+
+        noiseSource.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noiseSource.start(0);
+        lfo.start(0);
+
+        soundNodesRef.current = { audioCtx, noiseSource, lfo };
+      } catch (err) {
+        console.warn("Wave synthesizer startup failed:", err);
+      }
+    } else {
+      if (soundNodesRef.current) {
+        try {
+          soundNodesRef.current.noiseSource.stop();
+          soundNodesRef.current.lfo.stop();
+          soundNodesRef.current.audioCtx.close();
+        } catch (e) {}
+        soundNodesRef.current = null;
+      }
+    }
+    return () => {
+      if (soundNodesRef.current) {
+        try {
+          soundNodesRef.current.noiseSource.stop();
+          soundNodesRef.current.lfo.stop();
+          soundNodesRef.current.audioCtx.close();
+        } catch (e) {}
+      }
+    };
+  }, [soundEnabled]);
 
   const playSound = (type) => {
     if (!soundEnabled) return;
