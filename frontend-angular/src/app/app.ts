@@ -27,7 +27,7 @@ interface Bottle {
 })
 export class App implements OnInit, OnDestroy {
   private http = inject(HttpClient);
-  private apiBase = 'https://ce48269e26c4dc.lhr.life/api';
+  private apiBase = 'https://task-management-mern-mean.vercel.app/api';
 
   // Signals
   bottles = signal<Bottle[]>([]);

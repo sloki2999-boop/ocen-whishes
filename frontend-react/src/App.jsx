@@ -12,7 +12,7 @@ import {
   Filter
 } from 'lucide-react';
 
-const API_BASE = 'https://ce48269e26c4dc.lhr.life/api';
+const API_BASE = 'https://task-management-mern-mean.vercel.app/api';
 
 function App() {
   const [bottles, setBottles] = useState([]);
