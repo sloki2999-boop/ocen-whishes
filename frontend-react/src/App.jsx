@@ -1,243 +1,113 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  Users, 
-  Folder, 
-  Plus, 
+  Compass, 
+  Send, 
   Trash2, 
-  Bell, 
-  Check, 
-  Filter, 
-  Grid, 
-  Calendar,
-  Layers,
-  ChevronRight,
-  RefreshCw
+  MessageSquare, 
+  HelpCircle,
+  Volume2, 
+  VolumeX,
+  PlusCircle,
+  X,
+  Filter
 } from 'lucide-react';
 
-const API_BASE = 'https://1a1d6f507f27b2.lhr.life/api';
+const API_BASE = 'https://ce48269e26c4dc.lhr.life/api';
 
 function App() {
-  const [users, setUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [teams, setTeams] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, kanban, teams, notifications
+  const [bottles, setBottles] = useState([]);
+  const [selectedBottle, setSelectedBottle] = useState(null);
+  const [showWriteModal, setShowWriteModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [serverStatus, setServerStatus] = useState('offline');
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
-  // Form states for creating new task
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDesc, setNewTaskDesc] = useState('');
-  const [newTaskProject, setNewTaskProject] = useState('');
-  const [newTaskAssignee, setNewTaskAssignee] = useState('');
-  const [newTaskPriority, setNewTaskPriority] = useState('Medium');
-  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  // Filters
+  const [activeFilter, setActiveFilter] = useState('all'); // all, amethyst, aquamarine, citrine, none
 
-  // Form states for creating new project
-  const [showProjectModal, setShowProjectModal] = useState(false);
-  const [newProjName, setNewProjName] = useState('');
-  const [newProjDesc, setNewProjDesc] = useState('');
-  const [newProjTeam, setNewProjTeam] = useState('');
+  // Form states
+  const [messageText, setMessageText] = useState('');
+  const [bottleType, setBottleType] = useState('sapphire'); // sapphire, emerald, amber, rose
+  const [stoneType, setStoneType] = useState('none'); // amethyst, aquamarine, citrine, none
+  const [replyText, setReplyText] = useState('');
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  // Fetch notifications whenever current user changes
-  useEffect(() => {
-    if (currentUser) {
-      fetchNotifications(currentUser._id);
-    }
-  }, [currentUser]);
-
-  const fetchInitialData = async () => {
-    setLoading(true);
+  // Audio Context (Mock sound synthesis since we cannot load local mp3s reliably)
+  const playSound = (type) => {
+    if (!soundEnabled) return;
     try {
-      // Check server status
-      const statusRes = await fetch(`${API_BASE}/status`).catch(() => null);
-      if (statusRes && statusRes.ok) {
-        setServerStatus('online');
-      } else {
-        setServerStatus('offline');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch users
-      const usersRes = await fetch(`${API_BASE}/users`);
-      const usersData = await usersRes.json();
-      setUsers(usersData);
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
       
-      // Default to first user
-      if (usersData.length > 0 && !currentUser) {
-        setCurrentUser(usersData[0]);
-      }
-
-      // Fetch teams, projects, tasks
-      const teamsRes = await fetch(`${API_BASE}/teams`);
-      const teamsData = await teamsRes.json();
-      setTeams(teamsData);
-
-      const projectsRes = await fetch(`${API_BASE}/projects`);
-      const projectsData = await projectsRes.json();
-      setProjects(projectsData);
-
-      const tasksRes = await fetch(`${API_BASE}/tasks`);
-      const tasksData = await tasksRes.json();
-      setTasks(tasksData);
-
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setServerStatus('offline');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchNotifications = async (userId) => {
-    try {
-      const res = await fetch(`${API_BASE}/notifications?userId=${userId}`);
-      const data = await res.json();
-      setNotifications(data);
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-    }
-  };
-
-  const fetchTasks = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/tasks`);
-      const data = await res.json();
-      setTasks(data);
-    } catch (err) {
-      console.error('Error fetching tasks:', err);
-    }
-  };
-
-  const handleCreateTask = async (e) => {
-    e.preventDefault();
-    if (!newTaskTitle || !newTaskProject || !newTaskDueDate) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newTaskTitle,
-          description: newTaskDesc,
-          project: newTaskProject,
-          assignee: newTaskAssignee || null,
-          priority: newTaskPriority,
-          dueDate: newTaskDueDate
-        })
-      });
-
-      if (res.ok) {
-        // Reset form
-        setNewTaskTitle('');
-        setNewTaskDesc('');
-        setNewTaskProject('');
-        setNewTaskAssignee('');
-        setNewTaskPriority('Medium');
-        setNewTaskDueDate('');
-        setShowTaskModal(false);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (type === 'splash') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      } else if (type === 'uncork') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } else if (type === 'ambient') {
+        // Soft white noise wave
+        const bufferSize = audioCtx.sampleRate * 2;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        const whiteNoise = audioCtx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
         
-        // Refresh
-        await fetchTasks();
-        if (currentUser) fetchNotifications(currentUser._id);
-      }
-    } catch (err) {
-      console.error('Error creating task:', err);
-    }
-  };
-
-  const handleCreateProject = async (e) => {
-    e.preventDefault();
-    if (!newProjName || !newProjTeam) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/projects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newProjName,
-          description: newProjDesc,
-          team: newProjTeam
-        })
-      });
-
-      if (res.ok) {
-        setNewProjName('');
-        setNewProjDesc('');
-        setNewProjTeam('');
-        setShowProjectModal(false);
+        whiteNoise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
         
-        // Refresh projects
-        const projRes = await fetch(`${API_BASE}/projects`);
-        const projData = await projRes.json();
-        setProjects(projData);
+        gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 1);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 2);
+        
+        whiteNoise.start();
       }
-    } catch (err) {
-      console.error('Error creating project:', err);
+    } catch (e) {
+      console.warn('Audio synthesis failed:', e);
     }
   };
 
-  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+  const canvasRef = useRef(null);
+  const bottlesRef = useRef([]);
+
+  // Fetch bottles
+  const fetchBottles = async () => {
     try {
-      const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+      const res = await fetch(`${API_BASE}/bottles`);
+      const data = await res.json();
+      setBottles(data);
+      
+      // Update canvas bottles reference preserving visual states if possible
+      bottlesRef.current = data.map(b => {
+        const existing = bottlesRef.current.find(eb => eb._id === b._id);
+        return {
+          ...b,
+          x: existing ? existing.x : (b.x / 100) * (canvasRef.current ? canvasRef.current.width : window.innerWidth),
+          y: existing ? existing.y : (b.y / 100) * (canvasRef.current ? canvasRef.current.height : window.innerHeight),
+          angle: existing ? existing.angle : Math.random() * Math.PI * 2,
+          pulse: Math.random() * Math.PI,
+          bubbles: existing ? existing.bubbles : []
+        };
       });
-      if (res.ok) {
-        fetchTasks();
-      }
-    } catch (err) {
-      console.error('Error updating task:', err);
-    }
-  };
-
-  const handleDeleteTask = async (taskId) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-    try {
-      const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchTasks();
-      }
-    } catch (err) {
-      console.error('Error deleting task:', err);
-    }
-  };
-
-  const handleMarkNotificationRead = async (notifId) => {
-    try {
-      const res = await fetch(`${API_BASE}/notifications/${notifId}/read`, {
-        method: 'PUT'
-      });
-      if (res.ok) {
-        if (currentUser) fetchNotifications(currentUser._id);
-      }
-    } catch (err) {
-      console.error('Error updating notification:', err);
-    }
-  };
-
-  const triggerSeed = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/seed`, { method: 'POST' });
-      if (res.ok) {
-        alert('Database re-seeded successfully!');
-        await fetchInitialData();
-      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -245,522 +115,542 @@ function App() {
     }
   };
 
-  // Helper stats
-  const getTasksStats = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  useEffect(() => {
+    fetchBottles();
+    // Poll every 10 seconds to keep synced
+    const interval = setInterval(fetchBottles, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const overdue = tasks.filter(t => t.status !== 'Done' && new Date(t.dueDate) < today);
-    const dueToday = tasks.filter(t => {
-      const d = new Date(t.dueDate);
-      return t.status !== 'Done' && 
-             d.getDate() === today.getDate() && 
-             d.getMonth() === today.getMonth() && 
-             d.getFullYear() === today.getFullYear();
+  // Sync canvas bottles list when filter changes
+  const filteredBottles = bottlesRef.current.filter(b => {
+    if (activeFilter === 'all') return true;
+    return b.stoneType === activeFilter;
+  });
+
+  // Canvas render loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Star data
+    const stars = Array.from({ length: 80 }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * (window.innerHeight * 0.4),
+      size: Math.random() * 1.5 + 0.5,
+      twinkle: Math.random() * Math.PI
+    }));
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Draw Sky Gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
+      skyGrad.addColorStop(0, '#060a13');
+      skyGrad.addColorStop(0.5, '#0b1325');
+      skyGrad.addColorStop(1, '#16223f');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 2. Draw Stars
+      ctx.fillStyle = '#ffffff';
+      stars.forEach(star => {
+        star.twinkle += 0.02;
+        const opacity = (Math.sin(star.twinkle) + 1) / 2 * 0.8 + 0.2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 3. Draw Glowing Moon
+      const moonX = canvas.width * 0.8;
+      const moonY = canvas.height * 0.15;
+      const moonGlow = ctx.createRadialGradient(moonX, moonY, 10, moonX, moonY, 80);
+      moonGlow.addColorStop(0, 'rgba(255, 253, 245, 0.4)');
+      moonGlow.addColorStop(0.5, 'rgba(235, 245, 255, 0.1)');
+      moonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = moonGlow;
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, 80, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fffdf0';
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4. Update and Draw Floating Bottles
+      const now = Date.now();
+      bottlesRef.current.forEach(bottle => {
+        // Check filter
+        if (activeFilter !== 'all' && bottle.stoneType !== activeFilter) return;
+
+        // Update coordinates (drift slowly to the right)
+        bottle.x += bottle.speed;
+        if (bottle.x > canvas.width + 40) {
+          bottle.x = -40;
+          bottle.y = Math.random() * (canvas.height * 0.5) + (canvas.height * 0.3);
+        }
+
+        // Float wave oscillation
+        bottle.pulse += 0.015;
+        const waveOffset = Math.sin(bottle.pulse) * 8;
+        const currentY = bottle.y + waveOffset;
+
+        // Generate tiny rising bubbles from the bottle
+        if (Math.random() < 0.03) {
+          bottle.bubbles.push({
+            x: bottle.x + (Math.random() * 20 - 10),
+            y: currentY,
+            size: Math.random() * 2 + 1,
+            speedY: Math.random() * 0.5 + 0.3,
+            opacity: 1
+          });
+        }
+
+        // Draw bubbles
+        bottle.bubbles.forEach((bubble, idx) => {
+          bubble.y -= bubble.speedY;
+          bubble.opacity -= 0.005;
+          if (bubble.opacity <= 0) {
+            bottle.bubbles.splice(idx, 1);
+            return;
+          }
+          ctx.fillStyle = `rgba(255, 255, 255, ${bubble.opacity * 0.4})`;
+          ctx.beginPath();
+          ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Set bottle neon glows based on color type
+        let glowColor = '#3b82f6'; // sapphire
+        if (bottle.bottleType === 'emerald') glowColor = '#10b981';
+        else if (bottle.bottleType === 'amber') glowColor = '#f59e0b';
+        else if (bottle.bottleType === 'rose') glowColor = '#ec4899';
+
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = glowColor;
+
+        // Draw glowing stone attachment if present
+        if (bottle.stoneType && bottle.stoneType !== 'none') {
+          let stoneGlow = '#d946ef'; // amethyst
+          if (bottle.stoneType === 'aquamarine') stoneGlow = '#06b6d4';
+          else if (bottle.stoneType === 'citrine') stoneGlow = '#eab308';
+          
+          ctx.fillStyle = stoneGlow;
+          ctx.shadowColor = stoneGlow;
+          ctx.beginPath();
+          ctx.arc(bottle.x, currentY + 12, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Draw Bottle Body
+        ctx.fillStyle = glowColor;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+
+        // Bottle silhouette
+        ctx.beginPath();
+        // Neck
+        ctx.moveTo(bottle.x - 4, currentY - 15);
+        ctx.lineTo(bottle.x + 4, currentY - 15);
+        ctx.lineTo(bottle.x + 4, currentY - 8);
+        // Shoulders
+        ctx.bezierCurveTo(bottle.x + 10, currentY - 8, bottle.x + 12, currentY - 3, bottle.x + 12, currentY);
+        // Body
+        ctx.lineTo(bottle.x + 10, currentY + 15);
+        // Base
+        ctx.bezierCurveTo(bottle.x + 10, currentY + 22, bottle.x - 10, currentY + 22, bottle.x - 10, currentY + 15);
+        // Left side
+        ctx.lineTo(bottle.x - 12, currentY);
+        ctx.bezierCurveTo(bottle.x - 12, currentY - 3, bottle.x - 10, currentY - 8, bottle.x - 4, currentY - 8);
+        ctx.closePath();
+
+        // Fill with slight semi-transparency
+        ctx.fillStyle = `rgba(${parseInt(glowColor.substr(1,2),16)}, ${parseInt(glowColor.substr(3,2),16)}, ${parseInt(glowColor.substr(5,2),16)}, 0.15)`;
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw cork
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#a16207'; // Cork brown
+        ctx.fillRect(bottle.x - 3, currentY - 18, 6, 4);
+      });
+
+      // 5. Draw Parallax Ocean Waves (Foreground overlay)
+      const waveGrad1 = ctx.createLinearGradient(0, canvas.height * 0.4, 0, canvas.height);
+      waveGrad1.addColorStop(0, 'rgba(10, 24, 53, 0.4)');
+      waveGrad1.addColorStop(1, 'rgba(5, 12, 28, 0.9)');
+
+      ctx.fillStyle = waveGrad1;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height);
+      for (let i = 0; i <= canvas.width; i += 20) {
+        const y = Math.sin(i * 0.003 + now * 0.0006) * 15 + canvas.height * 0.55;
+        ctx.lineTo(i, y);
+      }
+      ctx.lineTo(canvas.width, canvas.height);
+      ctx.closePath();
+      ctx.fill();
+
+      const waveGrad2 = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
+      waveGrad2.addColorStop(0, 'rgba(12, 34, 76, 0.5)');
+      waveGrad2.addColorStop(1, 'rgba(4, 9, 21, 0.95)');
+
+      ctx.fillStyle = waveGrad2;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height);
+      for (let i = 0; i <= canvas.width; i += 20) {
+        const y = Math.cos(i * 0.004 - now * 0.0008) * 12 + canvas.height * 0.65;
+        ctx.lineTo(i, y);
+      }
+      ctx.lineTo(canvas.width, canvas.height);
+      ctx.closePath();
+      ctx.fill();
+
+      animationId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [activeFilter]);
+
+  // Click on Canvas to catch bottle
+  const handleCanvasClick = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    // Check hit boxes
+    const clicked = bottlesRef.current.find(bottle => {
+      // Filter check
+      if (activeFilter !== 'all' && bottle.stoneType !== activeFilter) return false;
+
+      const waveOffset = Math.sin(bottle.pulse) * 8;
+      const bY = bottle.y + waveOffset;
+
+      const dist = Math.sqrt((clickX - bottle.x) ** 2 + (clickY - bY) ** 2);
+      return dist < 30; // 30px click radius
     });
 
-    return {
-      total: tasks.length,
-      completed: tasks.filter(t => t.status === 'Done').length,
-      pending: tasks.filter(t => t.status !== 'Done').length,
-      overdue: overdue.length,
-      dueToday: dueToday.length
-    };
+    if (clicked) {
+      playSound('uncork');
+      setSelectedBottle(clicked);
+    }
   };
 
-  const stats = getTasksStats();
-  const unreadNotifs = notifications.filter(n => !n.read).length;
+  // Launch a bottle
+  const handleLaunchBottle = async (e) => {
+    e.preventDefault();
+    if (!messageText.trim()) return;
 
-  if (loading) {
-    return (
-      <div className="app-loading">
-        <div className="spinner"></div>
-        <p>Loading your workspaces...</p>
-      </div>
-    );
-  }
+    try {
+      const res = await fetch(`${API_BASE}/bottles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: messageText,
+          bottleType,
+          stoneType
+        })
+      });
 
-  if (serverStatus === 'offline') {
-    return (
-      <div className="app-offline">
-        <AlertTriangle size={48} className="text-warning" />
-        <h2>Connection Lost</h2>
-        <p>Could not connect to the Backend API server on {API_BASE}.</p>
-        <p className="subtext">Make sure the Express backend server is running and MongoDB is active.</p>
-        <button onClick={fetchInitialData} className="btn btn-primary flex items-center gap-2 mt-4">
-          <RefreshCw size={16} /> Retry Connection
-        </button>
-      </div>
-    );
-  }
+      if (res.ok) {
+        playSound('splash');
+        setMessageText('');
+        setBottleType('sapphire');
+        setStoneType('none');
+        setShowWriteModal(false);
+        await fetchBottles();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Submit a reply
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    if (!replyText.trim() || !selectedBottle) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/bottles/${selectedBottle._id}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reply: replyText })
+      });
+
+      if (res.ok) {
+        setReplyText('');
+        const updated = await res.json();
+        
+        // Update selected bottle in state
+        setSelectedBottle(updated);
+        
+        // Refresh items in background
+        await fetchBottles();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Sink bottle (delete)
+  const handleSinkBottle = async (id) => {
+    if (!confirm('Are you sure you want to sink this bottle to the deep dark sea forever?')) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/bottles/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        setSelectedBottle(null);
+        await fetchBottles();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
-    <div className="app-container">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <Layers className="brand-icon" />
-          <span>Apex Tasks</span>
-          <span className="platform-pill mern">MERN</span>
-        </div>
+    <div className="ocean-app">
+      {/* Stars Canvas Background */}
+      <canvas 
+        ref={canvasRef} 
+        onClick={handleCanvasClick}
+        className="ocean-canvas"
+      />
 
-        {/* Current User Selector */}
-        <div className="user-profile-selector">
-          <label>Viewing As:</label>
-          <div className="select-wrapper">
-            <select 
-              value={currentUser ? currentUser._id : ''} 
-              onChange={(e) => {
-                const u = users.find(usr => usr._id === e.target.value);
-                setCurrentUser(u);
-              }}
+      {/* Floating UI Elements */}
+      <div className="ui-overlay">
+        <header className="ocean-header">
+          <div className="brand flex items-center gap-2">
+            <Compass className="brand-logo animate-spin-slow" />
+            <div>
+              <h1>Cosmic Sea</h1>
+              <p className="sub">Deep Ocean Message Bottles</p>
+            </div>
+          </div>
+
+          <div className="audio-and-filters">
+            {/* Soft music toggle */}
+            <button 
+              onClick={() => {
+                setSoundEnabled(!soundEnabled);
+                if (!soundEnabled) playSound('splash');
+              }} 
+              className="btn-round-ui"
+              title={soundEnabled ? 'Disable Sounds' : 'Enable Sounds'}
             >
-              {users.map(u => (
-                <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
-              ))}
-            </select>
-          </div>
-          {currentUser && (
-            <div className="active-user-details">
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="avatar" />
-              <div>
-                <p className="name">{currentUser.name}</p>
-                <p className="role">{currentUser.role}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <nav className="sidebar-nav">
-          <button 
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <Grid size={18} />
-            <span>Dashboard</span>
-          </button>
-          <button 
-            className={`nav-item ${activeTab === 'kanban' ? 'active' : ''}`}
-            onClick={() => setActiveTab('kanban')}
-          >
-            <Layers size={18} />
-            <span>Kanban Board</span>
-          </button>
-          <button 
-            className={`nav-item ${activeTab === 'teams' ? 'active' : ''}`}
-            onClick={() => setActiveTab('teams')}
-          >
-            <Users size={18} />
-            <span>Teams</span>
-          </button>
-          <button 
-            className={`nav-item ${activeTab === 'notifications' ? 'active' : ''}`}
-            onClick={() => setActiveTab('notifications')}
-          >
-            <div className="relative">
-              <Bell size={18} />
-              {unreadNotifs > 0 && <span className="badge">{unreadNotifs}</span>}
-            </div>
-            <span>Notifications</span>
-          </button>
-        </nav>
-
-        <div className="sidebar-footer">
-          <button onClick={triggerSeed} className="btn-seed flex items-center gap-1">
-            <RefreshCw size={14} /> Re-seed Data
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="main-content">
-        <header className="header">
-          <div className="header-info">
-            <h1>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} View</h1>
-            <p className="subtext">Manage deadlines, projects and task boards</p>
-          </div>
-          <div className="header-actions">
-            <button onClick={() => setShowProjectModal(true)} className="btn btn-secondary flex items-center gap-1">
-              <Folder size={16} /> New Project
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
-            <button onClick={() => setShowTaskModal(true)} className="btn btn-primary flex items-center gap-1">
-              <Plus size={16} /> New Task
-            </button>
+
+            {/* Filter buttons */}
+            <div className="filter-bar">
+              <button 
+                onClick={() => setActiveFilter('all')} 
+                className={`filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
+              >
+                All Currents
+              </button>
+              <button 
+                onClick={() => setActiveFilter('amethyst')} 
+                className={`filter-btn amethyst ${activeFilter === 'amethyst' ? 'active' : ''}`}
+              >
+                Amethyst
+              </button>
+              <button 
+                onClick={() => setActiveFilter('aquamarine')} 
+                className={`filter-btn aquamarine ${activeFilter === 'aquamarine' ? 'active' : ''}`}
+              >
+                Aquamarine
+              </button>
+              <button 
+                onClick={() => setActiveFilter('citrine')} 
+                className={`filter-btn citrine ${activeFilter === 'citrine' ? 'active' : ''}`}
+              >
+                Citrine
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Dashboard View */}
-        {activeTab === 'dashboard' && (
-          <div className="view-content fade-in">
-            {/* Stats Bar */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="icon-wrapper blue">
-                  <Layers size={20} />
-                </div>
-                <div className="stat-info">
-                  <p className="label">Total Tasks</p>
-                  <h3>{stats.total}</h3>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="icon-wrapper green">
-                  <CheckCircle size={20} />
-                </div>
-                <div className="stat-info">
-                  <p className="label">Completed</p>
-                  <h3>{stats.completed} <span className="percent">({stats.total ? Math.round((stats.completed/stats.total)*100) : 0}%)</span></h3>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="icon-wrapper orange">
-                  <Clock size={20} />
-                </div>
-                <div className="stat-info">
-                  <p className="label">Due Today</p>
-                  <h3 className={stats.dueToday > 0 ? 'text-warn' : ''}>{stats.dueToday}</h3>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="icon-wrapper red">
-                  <AlertTriangle size={20} />
-                </div>
-                <div className="stat-info">
-                  <p className="label">Overdue</p>
-                  <h3 className={stats.overdue > 0 ? 'text-danger' : ''}>{stats.overdue}</h3>
-                </div>
-              </div>
-            </div>
+        {/* Instructions */}
+        <div className="ocean-info-toast">
+          <HelpCircle size={14} />
+          <span>Click a drifting glowing bottle to pull it in and read its secret scroll.</span>
+        </div>
 
-            {/* Dashboard Sections */}
-            <div className="dashboard-grid">
-              {/* Projects List */}
-              <div className="card projects-section">
-                <h2>Active Projects</h2>
-                <div className="project-list">
-                  {projects.map(proj => {
-                    const projTasks = tasks.filter(t => t.project?._id === proj._id);
-                    const compTasks = projTasks.filter(t => t.status === 'Done');
-                    const progress = projTasks.length ? Math.round((compTasks.length / projTasks.length) * 100) : 0;
-                    
-                    return (
-                      <div key={proj._id} className="project-item">
-                        <div className="project-header">
-                          <div>
-                            <h4>{proj.name}</h4>
-                            <p>{proj.description || 'No description'}</p>
-                          </div>
-                          <span className="team-badge">{proj.team?.name}</span>
-                        </div>
-                        <div className="progress-bar-container">
-                          <div className="progress-bar-labels">
-                            <span>Progress</span>
-                            <span>{progress}% ({compTasks.length}/{projTasks.length} tasks)</span>
-                          </div>
-                          <div className="progress-track">
-                            <div className="progress-fill" style={{ width: `${progress}%` }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+        {/* Launch button */}
+        <button 
+          onClick={() => setShowWriteModal(true)} 
+          className="btn-launch-bottle flex items-center gap-2"
+        >
+          <PlusCircle size={20} />
+          <span>Cast a Bottle into the Sea</span>
+        </button>
+      </div>
 
-              {/* Deadlines Widget */}
-              <div className="card deadlines-section">
-                <h2>Upcoming Deadlines</h2>
-                <div className="deadline-list">
-                  {tasks
-                    .filter(t => t.status !== 'Done')
-                    .slice(0, 5)
-                    .map(t => {
-                      const today = new Date();
-                      today.setHours(0,0,0,0);
-                      const due = new Date(t.dueDate);
-                      const isOverdue = due < today;
-                      
-                      return (
-                        <div key={t._id} className={`deadline-item ${isOverdue ? 'overdue' : ''}`}>
-                          <Calendar size={16} className="calendar-icon" />
-                          <div className="deadline-info">
-                            <h5>{t.title}</h5>
-                            <p className="proj">{t.project?.name}</p>
-                          </div>
-                          <div className="deadline-meta">
-                            <span className={`priority-badge ${t.priority.toLowerCase()}`}>{t.priority}</span>
-                            <span className="due-date">
-                              {due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Write Bottle Modal */}
+      {showWriteModal && (
+        <div className="backdrop fade-in">
+          <div className="paper-modal scroll-parchment">
+            <button onClick={() => setShowWriteModal(false)} className="close-btn">
+              <X size={20} />
+            </button>
+            
+            <form onSubmit={handleLaunchBottle} className="parchment-form">
+              <h2>Write your Secret Message</h2>
+              <p className="form-sub">Write a dream, a confession, or an anonymous note to the universe.</p>
+              
+              <textarea 
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Write your note here... (it will drift anonymously in the cosmic currents)"
+                maxLength={400}
+                required
+              />
 
-        {/* Kanban Board View */}
-        {activeTab === 'kanban' && (
-          <div className="view-content fade-in">
-            <div className="kanban-grid">
-              {['To Do', 'In Progress', 'Review', 'Done'].map(colStatus => {
-                const colTasks = tasks.filter(t => t.status === colStatus);
-                return (
-                  <div key={colStatus} className="kanban-col">
-                    <div className="col-header">
-                      <h3>{colStatus}</h3>
-                      <span className="count">{colTasks.length}</span>
-                    </div>
-                    
-                    <div className="col-cards">
-                      {colTasks.map(t => (
-                        <div key={t._id} className={`task-card border-prio-${t.priority.toLowerCase()}`}>
-                          <div className="card-top">
-                            <span className="project-tag">{t.project?.name}</span>
-                            <div className="card-actions">
-                              <button onClick={() => handleDeleteTask(t._id)} className="btn-delete">
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                          <h4>{t.title}</h4>
-                          <p className="desc">{t.description}</p>
-
-                          <div className="card-bottom">
-                            <div className="assignee">
-                              {t.assignee ? (
-                                <>
-                                  <img src={t.assignee.avatarUrl} alt={t.assignee.name} className="avatar-sm" />
-                                  <span>{t.assignee.name}</span>
-                                </>
-                              ) : (
-                                <span className="unassigned">Unassigned</span>
-                              )}
-                            </div>
-                            <div className="due">
-                              <Clock size={12} />
-                              <span className={new Date(t.dueDate) < new Date() && t.status !== 'Done' ? 'text-danger' : ''}>
-                                {new Date(t.dueDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="card-status-movers">
-                            {colStatus !== 'To Do' && (
-                              <button 
-                                onClick={() => handleUpdateTaskStatus(t._id, colStatus === 'In Progress' ? 'To Do' : colStatus === 'Review' ? 'In Progress' : 'Review')} 
-                                className="btn-move"
-                              >
-                                &larr;
-                              </button>
-                            )}
-                            {colStatus !== 'Done' && (
-                              <button 
-                                onClick={() => handleUpdateTaskStatus(t._id, colStatus === 'To Do' ? 'In Progress' : colStatus === 'In Progress' ? 'Review' : 'Done')} 
-                                className="btn-move ml-auto"
-                              >
-                                &rarr;
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Teams View */}
-        {activeTab === 'teams' && (
-          <div className="view-content fade-in">
-            <div className="teams-list">
-              {teams.map(team => (
-                <div key={team._id} className="card team-card-item">
-                  <div className="team-card-header">
-                    <h2>{team.name} Team</h2>
-                    <p>{team.description}</p>
-                  </div>
-                  
-                  <div className="team-members-section">
-                    <h3>Members ({team.members?.length || 0})</h3>
-                    <div className="members-grid">
-                      {team.members?.map(member => (
-                        <div key={member._id} className="member-row">
-                          <img src={member.avatarUrl} alt={member.name} className="avatar-med" />
-                          <div className="member-details">
-                            <h4>{member.name}</h4>
-                            <p>{member.role}</p>
-                            <p className="email">{member.email}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              <div className="form-settings">
+                <div className="setting-group">
+                  <label>Bottle Essence (Color)</label>
+                  <div className="bottle-selectors">
+                    {['sapphire', 'emerald', 'amber', 'rose'].map(type => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setBottleType(type)}
+                        className={`bottle-select-btn ${type} ${bottleType === type ? 'selected' : ''}`}
+                      >
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Notifications View */}
-        {activeTab === 'notifications' && (
-          <div className="view-content fade-in">
-            <div className="card notifications-card">
-              <div className="notif-header">
-                <h2>Notifications</h2>
-                <span className="notif-count">{unreadNotifs} unread</span>
-              </div>
-
-              <div className="notifications-list">
-                {notifications.length === 0 ? (
-                  <p className="empty-state">No notifications yet.</p>
-                ) : (
-                  notifications.map(notif => (
-                    <div key={notif._id} className={`notification-row ${notif.read ? 'read' : 'unread'}`}>
-                      <div className="notif-content">
-                        <div className="notif-dot"></div>
-                        <div className="notif-message">
-                          <p>{notif.message}</p>
-                          <span className="time">{new Date(notif.createdAt).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      {!notif.read && (
-                        <button 
-                          onClick={() => handleMarkNotificationRead(notif._id)} 
-                          className="btn-mark-read flex items-center gap-1"
-                        >
-                          <Check size={14} /> Mark Read
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Task Creation Modal */}
-      {showTaskModal && (
-        <div className="modal-backdrop">
-          <div className="modal card">
-            <div className="modal-header">
-              <h2>Create New Task</h2>
-              <button onClick={() => setShowTaskModal(false)} className="btn-close">&times;</button>
-            </div>
-            <form onSubmit={handleCreateTask} className="modal-form">
-              <div className="form-group">
-                <label>Task Title *</label>
-                <input 
-                  type="text" 
-                  value={newTaskTitle} 
-                  onChange={(e) => setNewTaskTitle(e.target.value)} 
-                  placeholder="e.g. Implement Auth Guards"
-                  required 
-                />
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea 
-                  value={newTaskDesc} 
-                  onChange={(e) => setNewTaskDesc(e.target.value)}
-                  placeholder="Provide details about the task"
-                />
-              </div>
-              <div className="form-group">
-                <label>Project *</label>
-                <select value={newTaskProject} onChange={(e) => setNewTaskProject(e.target.value)} required>
-                  <option value="">Select Project</option>
-                  {projects.map(p => (
-                    <option key={p._id} value={p._id}>{p.name} ({p.team?.name})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Assignee</label>
-                <select value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
-                  <option value="">Select Assignee (Optional)</option>
-                  {users.map(u => (
-                    <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group-row">
-                <div className="form-group">
-                  <label>Priority</label>
-                  <select value={newTaskPriority} onChange={(e) => setNewTaskPriority(e.target.value)}>
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
+                <div className="setting-group">
+                  <label>Attach Glowing Stone (Energy)</label>
+                  <select 
+                    value={stoneType} 
+                    onChange={(e) => setStoneType(e.target.value)}
+                  >
+                    <option value="none">None</option>
+                    <option value="amethyst">Amethyst (Purple)</option>
+                    <option value="aquamarine">Aquamarine (Blue)</option>
+                    <option value="citrine">Citrine (Yellow)</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Due Date *</label>
-                  <input 
-                    type="date" 
-                    value={newTaskDueDate} 
-                    onChange={(e) => setNewTaskDueDate(e.target.value)} 
-                    required 
-                  />
-                </div>
               </div>
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShowTaskModal(false)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">Create Task</button>
+
+              <div className="form-actions text-center">
+                <button type="submit" className="btn-cast flex items-center gap-2">
+                  <Send size={16} /> Seal & Launch Bottle
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Project Creation Modal */}
-      {showProjectModal && (
-        <div className="modal-backdrop">
-          <div className="modal card">
-            <div className="modal-header">
-              <h2>Create New Project</h2>
-              <button onClick={() => setShowProjectModal(false)} className="btn-close">&times;</button>
+      {/* Read Bottle Modal */}
+      {selectedBottle && (
+        <div className="backdrop fade-in">
+          <div className="paper-modal scroll-parchment read-mode">
+            <button onClick={() => setSelectedBottle(null)} className="close-btn">
+              <X size={20} />
+            </button>
+
+            <div className="parchment-content">
+              <div className="bottle-meta">
+                <span className={`glow-indicator ${selectedBottle.bottleType}`}>
+                  {selectedBottle.bottleType} Essence
+                </span>
+                {selectedBottle.stoneType && selectedBottle.stoneType !== 'none' && (
+                  <span className={`stone-indicator ${selectedBottle.stoneType}`}>
+                    {selectedBottle.stoneType} stone attached
+                  </span>
+                )}
+                <span className="date-tag">
+                  Drifting since {new Date(selectedBottle.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+
+              {/* Message */}
+              <div className="bottle-scroll-text">
+                <p className="main-message">"{selectedBottle.message}"</p>
+              </div>
+
+              {/* Replies Section */}
+              <div className="replies-section">
+                <h3>Scroll Reply History ({selectedBottle.replies?.length || 0})</h3>
+                
+                <div className="replies-list">
+                  {selectedBottle.replies?.length === 0 ? (
+                    <p className="empty-replies">No replies written on this scroll yet. Be the first...</p>
+                  ) : (
+                    selectedBottle.replies.map((reply, index) => (
+                      <div key={index} className="reply-item">
+                        <MessageSquare size={14} className="text-muted" />
+                        <p>{reply}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <form onSubmit={handleSendReply} className="reply-form flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Write a message onto this scroll..."
+                    maxLength={150}
+                    required
+                  />
+                  <button type="submit" className="btn-reply">
+                    <Send size={14} />
+                  </button>
+                </form>
+              </div>
+
+              {/* Actions */}
+              <div className="scroll-footer flex justify-between items-center mt-4">
+                <button 
+                  onClick={() => handleSinkBottle(selectedBottle._id)} 
+                  className="btn-sink flex items-center gap-1"
+                  title="Sink Bottle"
+                >
+                  <Trash2 size={14} /> Sink Bottle
+                </button>
+
+                <button 
+                  onClick={() => {
+                    playSound('splash');
+                    setSelectedBottle(null);
+                  }} 
+                  className="btn-toss"
+                >
+                  Toss back into the sea
+                </button>
+              </div>
             </div>
-            <form onSubmit={handleCreateProject} className="modal-form">
-              <div className="form-group">
-                <label>Project Name *</label>
-                <input 
-                  type="text" 
-                  value={newProjName} 
-                  onChange={(e) => setNewProjName(e.target.value)} 
-                  placeholder="e.g. Website Launch"
-                  required 
-                />
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea 
-                  value={newProjDesc} 
-                  onChange={(e) => setNewProjDesc(e.target.value)}
-                  placeholder="Provide description"
-                />
-              </div>
-              <div className="form-group">
-                <label>Team *</label>
-                <select value={newProjTeam} onChange={(e) => setNewProjTeam(e.target.value)} required>
-                  <option value="">Select Team</option>
-                  {teams.map(t => (
-                    <option key={t._id} value={t._id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShowProjectModal(false)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">Create Project</button>
-              </div>
-            </form>
           </div>
         </div>
       )}

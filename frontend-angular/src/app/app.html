@@ -14,414 +14,211 @@
   </button>
 </div>
 
-<div *ngIf="!loading() && serverStatus() === 'online'" class="app-container">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <svg class="brand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-      <span>Apex Tasks</span>
-      <span class="platform-pill mean">MEAN</span>
-    </div>
+<div *ngIf="!loading() && serverStatus() === 'online'" class="ocean-app">
+  <!-- Stars Canvas Background -->
+  <canvas 
+    id="oceanCanvas" 
+    (click)="handleCanvasClick($event)"
+    class="ocean-canvas"
+  ></canvas>
 
-    <!-- Current User Selector -->
-    <div class="user-profile-selector">
-      <label>Viewing As:</label>
-      <div class="select-wrapper">
-        <select 
-          [value]="currentUser() ? currentUser()?._id : ''" 
-          (change)="onUserChange($event)"
-        >
-          <option *ngFor="let u of users()" [value]="u._id">{{u.name}} ({{u.role}})</option>
-        </select>
-      </div>
-      <div *ngIf="currentUser()" class="active-user-details">
-        <img [src]="currentUser()?.avatarUrl" [alt]="currentUser()?.name" class="avatar" />
+  <!-- Floating UI Overlay -->
+  <div class="ui-overlay">
+    <header class="ocean-header">
+      <div class="brand flex items-center gap-2">
+        <svg class="brand-logo animate-spin-slow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
         <div>
-          <p class="name">{{currentUser()?.name}}</p>
-          <p class="role">{{currentUser()?.role}}</p>
+          <h1>Cosmic Sea</h1>
+          <p className="sub">Deep Ocean Message Bottles</p>
         </div>
       </div>
-    </div>
 
-    <!-- Navigation -->
-    <nav className="sidebar-nav">
-      <button 
-        [class.active]="activeTab() === 'dashboard'" 
-        (click)="activeTab.set('dashboard')" 
-        class="nav-item"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-        <span>Dashboard</span>
-      </button>
-      <button 
-        [class.active]="activeTab() === 'kanban'" 
-        (click)="activeTab.set('kanban')" 
-        class="nav-item"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-        <span>Kanban Board</span>
-      </button>
-      <button 
-        [class.active]="activeTab() === 'teams'" 
-        (click)="activeTab.set('teams')" 
-        class="nav-item"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>Teams</span>
-      </button>
-      <button 
-        [class.active]="activeTab() === 'notifications'" 
-        (click)="activeTab.set('notifications')" 
-        class="nav-item"
-      >
-        <div style="position: relative; display: inline-block;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-          <span *ngIf="unreadNotificationsCount() > 0" class="badge">{{unreadNotificationsCount()}}</span>
+      <div class="audio-and-filters">
+        <!-- Audio toggle -->
+        <button 
+          (click)="toggleSound()" 
+          class="btn-round-ui"
+          [title]="soundEnabled() ? 'Disable Sounds' : 'Enable Sounds'"
+        >
+          <svg *ngIf="soundEnabled()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <svg *ngIf="!soundEnabled()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+        </button>
+
+        <!-- Filters -->
+        <div class="filter-bar">
+          <button 
+            (click)="activeFilter.set('all')" 
+            [class.active]="activeFilter() === 'all'" 
+            class="filter-btn"
+          >
+            All Currents
+          </button>
+          <button 
+            (click)="activeFilter.set('amethyst')" 
+            [class.active]="activeFilter() === 'amethyst'" 
+            class="filter-btn amethyst"
+          >
+            Amethyst
+          </button>
+          <button 
+            (click)="activeFilter.set('aquamarine')" 
+            [class.active]="activeFilter() === 'aquamarine'" 
+            class="filter-btn aquamarine"
+          >
+            Aquamarine
+          </button>
+          <button 
+            (click)="activeFilter.set('citrine')" 
+            [class.active]="activeFilter() === 'citrine'" 
+            class="filter-btn citrine"
+          >
+            Citrine
+          </button>
         </div>
-        <span>Notifications</span>
-      </button>
-    </nav>
-
-    <div class="sidebar-footer">
-      <button (click)="triggerSeed()" class="btn-seed flex items-center gap-1">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 21H3v-5"/></svg>
-        Re-seed Data
-      </button>
-    </div>
-  </aside>
-
-  <!-- Main Content Area -->
-  <main class="main-content">
-    <header class="header">
-      <div class="header-info">
-        <h1>{{activeTab() | titlecase}} View</h1>
-        <p class="subtext">Manage deadlines, projects and task boards</p>
-      </div>
-      <div class="header-actions">
-        <button (click)="showProjectModal.set(true)" class="btn btn-secondary flex items-center gap-1">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
-          New Project
-        </button>
-        <button (click)="showTaskModal.set(true)" class="btn btn-primary flex items-center gap-1">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Task
-        </button>
       </div>
     </header>
 
-    <!-- Dashboard View -->
-    <div *ngIf="activeTab() === 'dashboard'" class="view-content fade-in">
-      <!-- Stats Grid -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="icon-wrapper blue">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-          </div>
-          <div class="stat-info">
-            <p class="label">Total Tasks</p>
-            <h3>{{stats().total}}</h3>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="icon-wrapper green">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-          </div>
-          <div class="stat-info">
-            <p class="label">Completed</p>
-            <h3>{{stats().completed}} <span class="percent">({{stats().percent}}%)</span></h3>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="icon-wrapper orange">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <div class="stat-info">
-            <p class="label">Due Today</p>
-            <h3 [class.text-warn]="stats().dueToday > 0">{{stats().dueToday}}</h3>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="icon-wrapper red">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div class="stat-info">
-            <p class="label">Overdue</p>
-            <h3 [class.text-danger]="stats().overdue > 0">{{stats().overdue}}</h3>
-          </div>
-        </div>
-      </div>
-
-      <div class="dashboard-grid">
-        <!-- Projects Section -->
-        <div class="card projects-section">
-          <h2>Active Projects</h2>
-          <div class="project-list">
-            <div *ngFor="let proj of projects()" class="project-item">
-              <div class="project-header">
-                <div>
-                  <h4>{{proj.name}}</h4>
-                  <p>{{proj.description || 'No description'}}</p>
-                </div>
-                <span class="team-badge">{{proj.team?.name}}</span>
-              </div>
-              <div class="progress-bar-container">
-                <div class="progress-bar-labels">
-                  <span>Progress</span>
-                  <span>{{getProjectProgress(proj._id)}}% ({{getCompletedTasksCountByProject(proj._id)}}/{{getTasksFilterByProject(proj._id).length}} tasks)</span>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" [style.width.%]="getProjectProgress(proj._id)"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Deadlines Section -->
-        <div class="card deadlines-section">
-          <h2>Upcoming Deadlines</h2>
-          <div class="deadline-list">
-            <div *ngFor="let t of getPendingUpcomingTasks()" class="deadline-item" [class.overdue]="isTaskOverdue(t.dueDate)">
-              <svg class="calendar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <div class="deadline-info">
-                <h5>{{t.title}}</h5>
-                <p class="proj">{{t.project?.name}}</p>
-              </div>
-              <div class="deadline-meta">
-                <span class="priority-badge" [ngClass]="t.priority.toLowerCase()">{{t.priority}}</span>
-                <span class="due-date">{{t.dueDate | date:'shortDate'}}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <!-- Instructions Toast -->
+    <div class="ocean-info-toast">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Click a drifting glowing bottle to pull it in and read its secret scroll.</span>
     </div>
 
-    <!-- Kanban Board View -->
-    <div *ngIf="activeTab() === 'kanban'" class="view-content fade-in">
-      <div class="kanban-grid">
-        <div *ngFor="let colStatus of ['To Do', 'In Progress', 'Review', 'Done']" class="kanban-col">
-          <div class="col-header">
-            <h3>{{colStatus}}</h3>
-            <span class="count">{{getTasksByStatus(colStatus).length}}</span>
-          </div>
+    <!-- Cast Button -->
+    <button 
+      (click)="showWriteModal.set(true)" 
+      class="btn-launch-bottle flex items-center gap-2"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="12" y2="12"/></svg>
+      <span>Cast a Bottle into the Sea</span>
+    </button>
+  </div>
 
-          <div class="col-cards">
-            <div *ngFor="let t of getTasksByStatus(colStatus)" class="task-card" [ngClass]="'border-prio-' + t.priority.toLowerCase()">
-              <div class="card-top">
-                <span class="project-tag">{{t.project?.name}}</span>
-                <div class="card-actions">
-                  <button (click)="handleDeleteTask(t._id)" class="btn-delete">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                  </button>
-                </div>
-              </div>
-              <h4>{{t.title}}</h4>
-              <p class="desc">{{t.description}}</p>
+  <!-- Write Bottle Modal -->
+  <div *ngIf="showWriteModal()" class="backdrop fade-in">
+    <div class="paper-modal scroll-parchment">
+      <button (click)="showWriteModal.set(false)" class="close-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
 
-              <div class="card-bottom">
-                <div class="assignee">
-                  <ng-container *ngIf="t.assignee; else unassignedTmpl">
-                    <img [src]="t.assignee.avatarUrl" [alt]="t.assignee.name" class="avatar-sm" />
-                    <span>{{t.assignee.name}}</span>
-                  </ng-container>
-                  <ng-template #unassignedTmpl>
-                    <span class="unassigned">Unassigned</span>
-                  </ng-template>
-                </div>
-                <div class="due">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  <span [class.text-danger]="isTaskOverdue(t.dueDate) && t.status !== 'Done'">
-                    {{t.dueDate | date:'shortDate'}}
-                  </span>
-                </div>
-              </div>
+      <form (submit)="handleLaunchBottle()" class="parchment-form">
+        <h2>Write your Secret Message</h2>
+        <p class="form-sub">Write a dream, a confession, or an anonymous note to the universe.</p>
 
-              <div class="card-status-movers">
-                <button 
-                  *ngIf="colStatus !== 'To Do'" 
-                  (click)="handleUpdateTaskStatus(t._id, colStatus === 'In Progress' ? 'To Do' : colStatus === 'Review' ? 'In Progress' : 'Review')" 
-                  class="btn-move"
-                >
-                  &larr;
-                </button>
-                <button 
-                  *ngIf="colStatus !== 'Done'" 
-                  (click)="handleUpdateTaskStatus(t._id, colStatus === 'To Do' ? 'In Progress' : colStatus === 'In Progress' ? 'Review' : 'Done')" 
-                  class="btn-move ml-auto"
-                >
-                  &rarr;
-                </button>
-              </div>
+        <textarea 
+          [(ngModel)]="messageText"
+          name="messageText"
+          placeholder="Write your note here... (it will drift anonymously in the cosmic currents)"
+          maxLength="400"
+          required
+        ></textarea>
+
+        <div class="form-settings">
+          <div class="setting-group">
+            <label>Bottle Essence (Color)</label>
+            <div class="bottle-selectors">
+              <button 
+                *ngFor="let type of ['sapphire', 'emerald', 'amber', 'rose']"
+                type="button" 
+                (click)="bottleType = type" 
+                [class.selected]="bottleType === type" 
+                class="bottle-select-btn"
+                [ngClass]="type"
+              >
+                {{type | titlecase}}
+              </button>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Teams View -->
-    <div *ngIf="activeTab() === 'teams'" class="view-content fade-in">
-      <div class="teams-list">
-        <div *ngFor="let team of teams()" class="card team-card-item">
-          <div class="team-card-header">
-            <h2>{{team.name}} Team</h2>
-            <p>{{team.description}}</p>
-          </div>
-
-          <div class="team-members-section">
-            <h3>Members ({{team.members?.length || 0}})</h3>
-            <div class="members-grid">
-              <div *ngFor="let member of team.members" class="member-row">
-                <img [src]="member.avatarUrl" [alt]="member.name" class="avatar-med" />
-                <div class="member-details">
-                  <h4>{{member.name}}</h4>
-                  <p>{{member.role}}</p>
-                  <p class="email">{{member.email}}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Notifications View -->
-    <div *ngIf="activeTab() === 'notifications'" class="view-content fade-in">
-      <div class="card notifications-card">
-        <div class="notif-header">
-          <h2>Notifications</h2>
-          <span class="notif-count">{{unreadNotificationsCount()}} unread</span>
-        </div>
-
-        <div class="notifications-list">
-          <p *ngIf="notifications().length === 0" class="empty-state">No notifications yet.</p>
-          <div *ngFor="let notif of notifications()" class="notification-row" [class.read]="notif.read" [class.unread]="!notif.read">
-            <div class="notif-content">
-              <div class="notif-dot"></div>
-              <div class="notif-message">
-                <p>{{notif.message}}</p>
-                <span class="time">{{notif.createdAt | date:'medium'}}</span>
-              </div>
-            </div>
-            <button 
-              *ngIf="!notif.read" 
-              (click)="handleMarkNotificationRead(notif._id)" 
-              class="btn-mark-read flex items-center gap-1"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Mark Read
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <!-- Create Task Modal -->
-  <div *ngIf="showTaskModal()" class="modal-backdrop">
-    <div class="modal card">
-      <div class="modal-header">
-        <h2>Create New Task</h2>
-        <button (click)="showTaskModal.set(false)" class="btn-close">&times;</button>
-      </div>
-      <form (submit)="handleCreateTask()" class="modal-form">
-        <div class="form-group">
-          <label>Task Title *</label>
-          <input 
-            type="text" 
-            [(ngModel)]="newTaskTitle" 
-            name="newTaskTitle"
-            placeholder="e.g. Implement Auth Guards"
-            required 
-          />
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <textarea 
-            [(ngModel)]="newTaskDesc" 
-            name="newTaskDesc"
-            placeholder="Provide details about the task"
-          ></textarea>
-        </div>
-        <div class="form-group">
-          <label>Project *</label>
-          <select [(ngModel)]="newTaskProject" name="newTaskProject" required>
-            <option value="">Select Project</option>
-            <option *ngFor="let p of projects()" [value]="p._id">{{p.name}} ({{p.team?.name}})</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Assignee</label>
-          <select [(ngModel)]="newTaskAssignee" name="newTaskAssignee">
-            <option value="">Select Assignee (Optional)</option>
-            <option *ngFor="let u of users()" [value]="u._id">{{u.name}} ({{u.role}})</option>
-          </select>
-        </div>
-        <div class="form-group-row">
-          <div class="form-group">
-            <label>Priority</label>
-            <select [(ngModel)]="newTaskPriority" name="newTaskPriority">
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
+          <div class="setting-group">
+            <label>Attach Glowing Stone (Energy)</label>
+            <select [(ngModel)]="stoneType" name="stoneType">
+              <option value="none">None</option>
+              <option value="amethyst">Amethyst (Purple)</option>
+              <option value="aquamarine">Aquamarine (Blue)</option>
+              <option value="citrine">Citrine (Yellow)</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Due Date *</label>
-            <input 
-              type="date" 
-              [(ngModel)]="newTaskDueDate" 
-              name="newTaskDueDate" 
-              required 
-            />
-          </div>
         </div>
-        <div class="modal-actions">
-          <button type="button" (click)="showTaskModal.set(false)" class="btn btn-secondary">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create Task</button>
+
+        <div class="form-actions text-center">
+          <button (click)="handleLaunchBottle()" type="button" class="btn-cast flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Seal & Launch Bottle
+          </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Create Project Modal -->
-  <div *ngIf="showProjectModal()" class="modal-backdrop">
-    <div class="modal card">
-      <div class="modal-header">
-        <h2>Create New Project</h2>
-        <button (click)="showProjectModal.set(false)" class="btn-close">&times;</button>
+  <!-- Read Bottle Modal -->
+  <div *ngIf="selectedBottle()" class="backdrop fade-in">
+    <div class="paper-modal scroll-parchment read-mode">
+      <button (click)="selectedBottle.set(null)" class="close-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <div class="parchment-content">
+        <div class="bottle-meta">
+          <span class="glow-indicator" [ngClass]="selectedBottle()?.bottleType">
+            {{selectedBottle()?.bottleType}} Essence
+          </span>
+          <span *ngIf="selectedBottle()?.stoneType && selectedBottle()?.stoneType !== 'none'" class="stone-indicator" [ngClass]="selectedBottle()?.stoneType">
+            {{selectedBottle()?.stoneType}} stone attached
+          </span>
+          <span class="date-tag">
+            Drifting since {{selectedBottle()?.createdAt | date:'shortDate'}}
+          </span>
+        </div>
+
+        <!-- Message -->
+        <div class="bottle-scroll-text">
+          <p class="main-message">"{{selectedBottle()?.message}}"</p>
+        </div>
+
+        <!-- Replies -->
+        <div class="replies-section">
+          <h3>Scroll Reply History ({{selectedBottle()?.replies?.length || 0}})</h3>
+
+          <div class="replies-list">
+            <p *ngIf="selectedBottle()?.replies?.length === 0" class="empty-replies">No replies written on this scroll yet. Be the first...</p>
+            <div *ngFor="let r of selectedBottle()?.replies" class="reply-item">
+              <svg class="text-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <p>{{r}}</p>
+            </div>
+          </div>
+
+          <form (submit)="handleSendReply()" class="reply-form flex items-center gap-2">
+            <input 
+              type="text" 
+              [(ngModel)]="replyText" 
+              name="replyText"
+              placeholder="Write a message onto this scroll..."
+              maxLength="150"
+              required 
+            />
+            <button type="submit" class="btn-reply">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </form>
+        </div>
+
+        <!-- Actions -->
+        <div class="scroll-footer flex justify-between items-center mt-4">
+          <button 
+            *ngIf="selectedBottle()"
+            (click)="handleSinkBottle(selectedBottle()!._id)" 
+            class="btn-sink flex items-center gap-1"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            Sink Bottle
+          </button>
+
+          <button (click)="selectedBottle.set(null); playSound('splash')" class="btn-toss">
+            Toss back into the sea
+          </button>
+        </div>
       </div>
-      <form (submit)="handleCreateProject()" class="modal-form">
-        <div class="form-group">
-          <label>Project Name *</label>
-          <input 
-            type="text" 
-            [(ngModel)]="newProjName" 
-            name="newProjName" 
-            placeholder="e.g. Website Launch"
-            required 
-          />
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <textarea 
-            [(ngModel)]="newProjDesc" 
-            name="newProjDesc" 
-            placeholder="Provide description"
-          ></textarea>
-        </div>
-        <div class="form-group">
-          <label>Team *</label>
-          <select [(ngModel)]="newProjTeam" name="newProjTeam" required>
-            <option value="">Select Team</option>
-            <option *ngFor="let t of teams()" [value]="t._id">{{t.name}}</option>
-          </select>
-        </div>
-        <div class="modal-actions">
-          <button type="button" (click)="showProjectModal.set(false)" class="btn btn-secondary">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create Project</button>
-        </div>
-      </form>
     </div>
   </div>
 </div>
