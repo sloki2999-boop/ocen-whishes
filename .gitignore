@@ -1,0 +1,16 @@
+# Dependencies
+**/node_modules/
+**/dist/
+**/tmp/
+**/.cache/
+
+# Local databases & env
+**/db.json
+**/.env
+**/.env.local
+
+# IDEs & System files
+**/.vscode/
+**/.idea/
+.DS_Store
+Thumbs.db
