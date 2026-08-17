@@ -54,7 +54,7 @@ interface Notification {
 })
 export class App implements OnInit {
   private http = inject(HttpClient);
-  private apiBase = 'http://localhost:5000/api';
+  private apiBase = 'https://1a1d6f507f27b2.lhr.life/api';
 
   // Signals for reactivity
   users = signal<User[]>([]);

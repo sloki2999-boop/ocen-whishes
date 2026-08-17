@@ -17,7 +17,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://1a1d6f507f27b2.lhr.life/api';
 
 function App() {
   const [users, setUsers] = useState([]);
