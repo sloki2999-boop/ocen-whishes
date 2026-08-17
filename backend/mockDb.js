@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const DB_FILE = path.join(__dirname, 'db.json');
+const DB_FILE = process.env.VERCEL
+  ? path.join('/tmp', 'db.json')
+  : path.join(__dirname, 'db.json');
 
 const initialData = {
   bottles: [
@@ -85,8 +87,14 @@ const initialData = {
   ]
 };
 
-// Initialize file or overwrite with new structure
-fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
+// Initialize file only if it does not exist
+if (!fs.existsSync(DB_FILE)) {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
+  } catch (err) {
+    console.error("Failed to initialize mock database:", err);
+  }
+}
 
 function readData() {
   try {
@@ -98,7 +106,11 @@ function readData() {
 }
 
 function writeData(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error("Failed to write to mock database:", err);
+  }
 }
 
 const mockDb = {
